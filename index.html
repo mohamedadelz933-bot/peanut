@@ -21,9 +21,10 @@ input,select{width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px
 .bad,.bad b{color:var(--bad)}.ok,.ok b{color:var(--ok)}
 .tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px 4px;border-bottom:1px solid var(--bd);text-align:right;white-space:nowrap}
 summary{cursor:pointer;font-weight:600}.mu{color:var(--mu);font-size:12px}.sw{display:flex;gap:8px;align-items:center;margin:4px 0;color:var(--tx);font-size:14px}.sw input{width:auto;margin:0}
+nav{flex-wrap:wrap}nav button{flex:1 1 30%;padding:9px 2px;font-size:13px}.sm{padding:4px 8px;border:1px solid var(--bd);background:none;color:var(--tx);border-radius:6px;font:inherit;cursor:pointer;font-size:12px}.sm.d{color:var(--bad)}.pill{display:inline-block;padding:3px 10px;border-radius:99px;background:var(--bg);font-size:13px;margin:2px}td .save,td .add{width:auto;display:inline-block;padding:8px 14px}
 </style></head><body><main>
 <h1>🥜 حسبة المقشرة</h1>
-<nav><button data-t="new" onclick="tab='new';show()">تشغيلة جديدة</button><button data-t="runs" onclick="tab='runs';show()">السجل</button><button data-t="prices" onclick="tab='prices';show()">الأسعار</button><button data-t="acc" style="display:none" onclick="tab='acc';show()">الوصول</button></nav>
+<nav><button data-t="new" onclick="tab='new';show()">تشغيلة جديدة</button><button data-t="runs" onclick="tab='runs';show()">السجل</button><button data-t="raws" onclick="tab='raws';show()">مخزن الخام</button><button data-t="fg" onclick="tab='fg';show()">المنتج التام</button><button data-t="prices" onclick="tab='prices';show()">الأسعار</button><button data-t="acc" style="display:none" onclick="tab='acc';show()">الوصول</button></nav>
 <p id="st" class="bad"></p><div id="v"></div>
 <p class="mu" id="ft">البيانات بتتحفظ على نفس الجهاز والمتصفح اللي بتفتح منه.</p>
 </main>
@@ -40,7 +41,7 @@ let S={alloc:'w',runs:[],prices:[
 {id:'g3',name:'فول نمرة 3',t:'prod',p:50},{id:'g4',name:'فول نمرة 4',t:'prod',p:40},
 {id:'sh',name:'قشر',t:'shell',p:3},
 {id:'c1',name:'عمالة',t:'cost',b:'kg',p:1.5},{id:'c2',name:'كهرباء وتشغيل الماكينة',t:'cost',b:'kg',p:0.6},{id:'c3',name:'تعبئة وتشوين',t:'cost',b:'run',p:50}]},tab='new';
-let DB=null,CAN_RUN=false,CAN_EDIT=false,CAN_ADD=false,ACC=false,SP=false,PERM=null,ME={},DID='',VW={},PM={},shown=0,got=0,pr=0,seeded=0,RM={},MN={},ITEMS=null,PR={},unM=null,unP=null,unR=null,unS=null;const timers={};
+let MV={},SC={},EM='',CAN_ST=false,unMv=null,unSc=null,mig=0,DB=null,CAN_RUN=false,CAN_EDIT=false,CAN_ADD=false,ACC=false,SP=false,PERM=null,ME={},DID='',VW={},PM={},shown=0,got=0,pr=0,seeded=0,RM={},MN={},ITEMS=null,PR={},unM=null,unP=null,unR=null,unS=null;const timers={};
 try{const a=JSON.parse(localStorage.getItem('mq1a'));if(a&&a.alloc)S.alloc=a.alloc}catch(e){}
 const save=()=>{try{localStorage.setItem('mq1a',JSON.stringify({alloc:S.alloc}))}catch(e){}};
 const newD=()=>({date:new Date().toISOString().slice(0,10),note:'',rawId:'',rawP:0,raw:0,moist:10,soaked:0,outs:{},shell:0});
@@ -76,14 +77,14 @@ function formH(){
 const R=P('raw');if(!R.find(x=>x.id==D.rawId)&&R[0]){D.rawId=R[0].id;D.rawP=R[0].p}
 return `<div class="card"><div class="g2"><label>التاريخ<input type="date" data-k="date" value="${D.date}"></label><label>ملاحظة / المورد<input data-k="note" value="${esc(D.note)}"></label></div>
 <div class="g2"><label>نوع الخام<select onchange="pickRaw(this.value)">${R.map(x=>`<option value="${x.id}" ${x.id==D.rawId?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label><label style="${SP?'':'display:none'}">سعر كجم الخام<input id="rp" type="number" step="any" data-k="rawP" value="${D.rawP}"></label></div>
-<div class="g2"><label>كمية الخام (كجم)<input type="number" step="any" data-k="raw" value="${D.raw||''}"></label><label>رطوبة النقع التقديرية %<input type="number" step="any" data-k="moist" value="${D.moist}"></label></div>
+<p id="rbal" class="mu"></p><div class="g2"><label>كمية الخام (كجم)<input type="number" step="any" data-k="raw" value="${D.raw||''}"></label><label>رطوبة النقع التقديرية %<input type="number" step="any" data-k="moist" value="${D.moist}"></label></div>
 <label>وزن الفول بعد النقع الفعلي (اختياري، لو كتبته بيلغي التقدير)<input type="number" step="any" data-k="soaked" value="${D.soaked||''}"></label></div>
 <div class="card"><h3>المخرجات (كجم)</h3><div class="g2">${P('prod').map(x=>`<label>${esc(x.name)}<input type="number" step="any" data-k="o_${x.id}" value="${D.outs[x.id]||''}"></label>`).join('')}<label>القشر<input type="number" step="any" data-k="shell" value="${D.shell||''}"></label></div></div>
 <div class="card" id="res"></div><p id="msg" class="bad"></p><button class="save" onclick="saveRun()">حفظ التشغيلة</button>`}
-function upd(){$('#res').innerHTML=resHTML(calc(mk(D)))}
+function upd(){$('#res').innerHTML=resHTML(calc(mk(D)));rbal()}
 function pickRaw(id){D.rawId=id;D.rawP=S.prices.find(x=>x.id==id).p;$('#rp').value=D.rawP;upd()}
 async function saveRun(){if(!(D.raw>0)){$('#msg').textContent='اكتب كمية الخام الأول.';return}
-const r={...mk(D),id:Date.now()};
+const r={...mk(D),id:Date.now(),no:nextNo()};
 try{const{main,mon}=split(r),b=FS.batch();b.set(FS.doc('runs/'+r.id),main);if(SP)b.set(FS.doc('money/'+r.id),mon);await b.commit()}catch(e){$('#msg').textContent='تعذر الحفظ في السحابة. تأكد من صلاحية الكتابة وجرب مرة أخرى.';return}
 const{date,moist,rawId,rawP}=D;D=newD();Object.assign(D,{date,moist,rawId,rawP});tab='runs';show()}
 function runsH(){const L=S.runs;if(!L.length)return '<div class="card">لسه مفيش تشغيلات متسجلة.</div>';
@@ -97,11 +98,11 @@ const sec=(t,title)=>`<div class="card"><h3>${title}</h3>${P(t).map(x=>`<div cla
 return `<p class="mu">الأسعار دي أرقام مبدئية، عدّلها على أسعارك. التشغيلات المتسجلة بتحتفظ بأسعارها وقت التسجيل.</p>`+sec('raw','أنواع الخام (سعر شراء الكجم)')+sec('prod','الأصناف الناتجة (سعر بيع الكجم)')+sec('shell','القشر (سعر بيع الكجم)')+sec('cost','تكاليف التشغيل')}
 function addP(t){S.prices.push({id:'x'+Date.now(),name:t=='raw'?'خام جديد':t=='prod'?'صنف جديد':'تكلفة جديدة',t,p:0,b:'kg'});save();pushPrices();show()}
 function delP(id){S.prices=S.prices.filter(x=>x.id!=id);save();pushPrices();show()}
-function show(){document.querySelector('nav').style.display=DB&&!ACC?'none':'';
+  function show(){document.querySelector('nav').style.display=DB&&!ACC?'none':'';
 if(DB&&!ACC){$('#v').innerHTML=lockH();return}
 if(tab=='prices'&&!SP||tab=='acc'&&!ME.owner)tab='new';
 document.querySelectorAll('nav button').forEach(b=>{b.classList.toggle('on',b.dataset.t==tab);if(b.dataset.t=='prices')b.style.display=SP?'':'none';if(b.dataset.t=='acc')b.style.display=ME.owner?'':'none'});
-$('#v').innerHTML=tab=='new'?formH():tab=='runs'?runsH():tab=='acc'?accH():priceH();if(tab=='new')upd();
+$('#v').innerHTML=tab=='new'?formH():tab=='runs'?runsH():tab=='acc'?accH():tab=='raws'?rawsH():tab=='fg'?fgH():priceH();if(tab=='new')upd();
 const off=s=>document.querySelectorAll(s).forEach(e=>e.disabled=true);
 if(tab=='new'&&!CAN_ADD)off('#v .save');
 if(tab=='runs'&&!CAN_RUN)off('#v [data-r],#v .add');
@@ -109,7 +110,7 @@ if(tab=='prices'&&!CAN_EDIT){off('#v input,#v select,#v button');$('#v').insertA
 const onIn=e=>{const t=e.target,k=t.dataset.k,p=t.dataset.p;
 if(k){const v=t.value;if(k.startsWith('o_'))D.outs[k.slice(2)]=+v||0;else D[k]=t.type=='number'?(+v||0):v;upd()}
 else if(p){const[id,f]=p.split(':'),x=S.prices.find(y=>y.id==id);if(x){x[f]=f=='p'?(+t.value||0):t.value;save();pushPrices()}}};
-const sumT=(r,c)=>`${r.date} · ${esc(r.rawN||'')} ${esc(r.note)} · ${n(r.raw)} كجم · ربح ${m(c.profit)}`,
+const sumT=(r,c)=>`${r.no?'#'+r.no+' · ':''}${r.date} · ${esc(r.rawN||'')} ${esc(r.note)} · ${n(r.raw)} كجم · ربح ${m(c.profit)}`,
 editH=r=>`<details style="margin-top:8px"><summary class="mu">تعديل أسعار التشغيلة دي</summary><div class="g2" style="margin-top:8px"><label>سعر كجم الخام<input type="number" step="any" data-r="${r.id}:rawP" value="${r.rawP}"></label>${r.prods.map((x,i)=>`<label>${esc(x.n)}<input type="number" step="any" data-r="${r.id}:p:${i}" value="${x.p}"></label>`).join('')}<label>القشر<input type="number" step="any" data-r="${r.id}:shellP" value="${r.shellP}"></label>${r.costs.map((x,i)=>`<label>${esc(x.n)} (${x.b=='kg'?'لكل كجم خام':'لكل تشغيلة'})<input type="number" step="any" data-r="${r.id}:c:${i}" value="${x.p}"></label>`).join('')}</div></details>`;
 document.addEventListener('input',e=>{const q=e.target.dataset.r;if(!q)return;
 const[id,f,i]=q.split(':'),r=S.runs.find(x=>x.id==id),v=+e.target.value||0;if(!r)return;
@@ -131,7 +132,7 @@ b.push([r.date,r.note,'قشر (إيراد)',r.shell,r.raw?r.shell/r.raw*100:0,r.
 const T={raw:'خام',prod:'صنف ناتج',shell:'قشر',cost:'تكلفة تشغيل'},
 p=[['النوع','الاسم','السعر','الحساب']].concat(S.prices.map(x=>[T[x.t],x.name,x.p,x.t=='cost'?(x.b=='kg'?'لكل كجم خام':'لكل تشغيلة'):'لكل كجم'])),
 wb=W.book_new();wb.Workbook={Views:[{RTL:true}]};
-W.book_append_sheet(wb,sh(a),'ملخص التشغيلات');W.book_append_sheet(wb,sh(b),'تفاصيل الأصناف');W.book_append_sheet(wb,sh(p),'الأسعار');
+W.book_append_sheet(wb,sh(a),'ملخص التشغيلات');W.book_append_sheet(wb,sh(b),'تفاصيل الأصناف');W.book_append_sheet(wb,sh(p),'الأسعار');W.book_append_sheet(wb,sh(stockRows('raw')),'حركة مخزن الخام');W.book_append_sheet(wb,sh(stockRows('fg')),'حركة المنتج التام');
 await DL.save({filename:'peanut-runs-'+new Date().toISOString().slice(0,10)+'.xlsx',data:XLSX.write(wb,{bookType:'xlsx',type:'array'})});
 xm.textContent='تم تجهيز الملف.'}
 catch(e){if(!e||e.code!='declined')xm.textContent='معرفناش نجهز الملف، جرب تاني.'}}
@@ -144,7 +145,7 @@ op.forEach(i=>{const d=document.getElementById(i);if(d)d.open=true})}
 const OWNER='mohamedadelz933@gmail.com',CFG={apiKey:"AIzaSyDZx5Sr8jIeCGq3DMyg8bhL0U7xd_PfJwQ",authDomain:"peanut-sheller.firebaseapp.com",projectId:"peanut-sheller",storageBucket:"peanut-sheller.firebasestorage.app",messagingSenderId:"889824132028",appId:"1:889824132028:web:99f88c7ef0587891c0c9b9"};
 firebase.initializeApp(CFG);const FS=firebase.firestore(),AU=firebase.auth();
 const cl=o=>JSON.parse(JSON.stringify(o));
-const split=r=>({main:cl({id:r.id,date:r.date,note:r.note,rawId:r.rawId,rawN:r.rawN,raw:r.raw,moist:r.moist,soaked:r.soaked,shell:r.shell,outs:r.outs,po:r.prods.map(x=>x.id),pn:Object.fromEntries(r.prods.map(x=>[x.id,x.n]))}),mon:cl({rawP:r.rawP,shellP:r.shellP,prods:Object.fromEntries(r.prods.map(x=>[x.id,x.p])),costs:r.costs})});
+const split=r=>({main:cl({id:r.id,no:r.no,date:r.date,note:r.note,rawId:r.rawId,rawN:r.rawN,raw:r.raw,moist:r.moist,soaked:r.soaked,shell:r.shell,outs:r.outs,po:r.prods.map(x=>x.id),pn:Object.fromEntries(r.prods.map(x=>[x.id,x.n]))}),mon:cl({rawP:r.rawP,shellP:r.shellP,prods:Object.fromEntries(r.prods.map(x=>[x.id,x.p])),costs:r.costs})});
 function mergePrices(){if(ITEMS)S.prices=ITEMS.map(x=>({...x,p:PR[x.id]||0}))}
 function rebuild(){const cur=id=>(S.prices.find(x=>x.id==id)||{}).p||0,sh=P('shell')[0],old=S.runs;
 S.runs=Object.values(RM).map(m=>{if(timers['r'+m.id]){const x=old.find(y=>y.id==m.id);if(x)return x}
@@ -156,11 +157,14 @@ if(SP&&!unM){unM=FS.collection('money').onSnapshot(sn=>{MN={};sn.docs.forEach(d=
 unP=FS.doc('prices/main').onSnapshot(sn=>{if(sn.metadata.hasPendingWrites||timers.set)return;PR=sn.exists?(sn.data().p||{}):{};mergePrices();rebuild();if(shown)refresh()},()=>{})}
 if(!SP&&unM){unM();unP();unM=unP=null;MN={};PR={};mergePrices();rebuild()}}
 function sync(){const st=$('#st');
-if(ACC&&!unR){unR=FS.collection('runs').onSnapshot(sn=>{RM={};sn.docs.forEach(d=>RM[d.id]=d.data());rebuild();got=1;st.textContent='';if(!shown&&pr){shown=1;show()}else if(shown)refresh()},
+if(ACC&&!unR){unR=FS.collection('runs').onSnapshot(sn=>{RM={};sn.docs.forEach(d=>RM[d.id]=d.data());rebuild();numberOld();got=1;st.textContent='';if(!shown&&pr){shown=1;show()}else if(shown)refresh()},
 e=>{st.textContent='تعذر قراءة التشغيلات: '+e.code;got=1;if(!shown&&pr){shown=1;show()}});
 unS=FS.doc('settings/main').onSnapshot(sn=>{if(sn.metadata.hasPendingWrites||timers.set)return;
 if(sn.exists){ITEMS=sn.data().items||[];mergePrices();rebuild()}else if(ME.owner&&!seeded){seeded=1;pushPrices()}
 if(shown)refresh()},()=>{})}
+if(ACC&&!unMv){unMv=FS.collection('moves').onSnapshot(sn=>{MV={};sn.docs.forEach(d=>MV[d.id]=d.data());if(shown)refresh()},e=>{$('#st').textContent='تعذر قراءة المخازن: '+e.code});
+unSc=FS.doc('stockcfg/main').onSnapshot(sn=>{SC=sn.exists?sn.data():{};if(shown)refresh()},()=>{})}
+if(!ACC&&unMv){unMv();unSc();unMv=unSc=null;MV={};SC={}}
 if(!ACC&&unR){unR();unS();unR=unS=null;RM={};ITEMS=null;S.runs=[]}
 watch()}
 const loginH=()=>`<div class="card"><h3>🥜 حسبة المقشرة</h3><p>سجّل الدخول بحساب جوجل. الدخول بيتم بعد موافقة المالك.</p><button class="save" onclick="login()">الدخول بحساب جوجل</button></div>`;
@@ -177,7 +181,7 @@ FS.collection('perms').onSnapshot(sn=>{sn.docs.forEach(d=>{if(!timers['p'+d.id])
 else{FS.doc('perms/'+ME.id).onSnapshot(sn=>{const was=ACC,ws=SP;PERM=sn.exists?sn.data():null;applyPerm();sync();pr=1;
 if(!shown&&(!ACC||got)){shown=1;show()}else if(shown){was!=ACC||ws!=SP?show():refresh()}},e=>{$('#st').textContent='تعذر قراءة الصلاحيات: '+e.code});
 try{const r=FS.doc('viewers/'+ME.id),sn=await r.get(),d=sn.exists?sn.data():{},dv={...(d.devices||{})},o=dv[DID]||{};dv[DID]={ua:devName(),first:o.first||Date.now(),last:Date.now()};await r.set({name:ME.name,email:ME.email,devices:dv})}catch(e){}}}
-function applyPerm(){const p=PERM||{},o=ME.owner;ACC=o||(!!p.on&&!(p.bd||[]).includes(DID));SP=o||(ACC&&!!p.sp);CAN_EDIT=o||(ACC&&!!p.ep);CAN_ADD=o||(ACC&&!!p.ar);CAN_RUN=o||(ACC&&!!p.er)}
+function applyPerm(){const p=PERM||{},o=ME.owner;ACC=o||(!!p.on&&!(p.bd||[]).includes(DID));SP=o||(ACC&&!!p.sp);CAN_EDIT=o||(ACC&&!!p.ep);CAN_ADD=o||(ACC&&!!p.ar);CAN_RUN=o||(ACC&&!!p.er);CAN_ST=o||(ACC&&!!p.st)}
 const lockH=()=>`<div class="card"><h3>🔒 في انتظار موافقة المالك</h3><p>تم تسجيل طلبك بحساب <b>${esc(ME.email||'')}</b>. لما المالك يوافق، هتفتح لك الصفحة تلقائيا.</p><button class="add" onclick="AU.signOut().then(()=>location.reload())">تسجيل الخروج</button></div>`;
 const devName=()=>{const u=navigator.userAgent;return ((u.match(/iPhone|iPad|Android|Windows|Macintosh|Linux/)||['جهاز'])[0])+' · '+((u.match(/Edg|Firefox|Chrome|Safari/)||['متصفح'])[0])};
 function accH(){const ids=Object.keys(VW).filter(i=>i!=ME.id);
@@ -185,9 +189,93 @@ if(!ids.length)return '<div class="card">لسه محدش سجّل دخول غي�
 const dv=ids.reduce((a,i)=>a+Object.keys(VW[i].devices||{}).length,0),
 sw=(i,k,l)=>`<label class=sw><input type=checkbox data-a=${i}|${k} ${(PM[i]||{})[k]?'checked':''}> ${l}</label>`;
 return `<div class="card"><h3>${ids.length} شخص · ${dv} جهاز</h3><p class=mu>أي شخص جديد بيظهر هنا من غير أي صلاحية لحد ما توافق عليه.</p></div>`+ids.map(i=>{const p=PM[i]||{},d=VW[i].devices||{};
-return `<div class="card"><b>${esc(VW[i].name||'زائر')}</b> <span class=mu>${esc(VW[i].email||'')} ${p.on?'':'· بانتظار الموافقة'}</span><div style="margin:6px 0">${sw(i,'on','دخول التطبيق')}${sw(i,'sp','رؤية الأسعار والتكاليف والأرباح')}${sw(i,'ep','تعديل الأسعار')}${sw(i,'ar','إضافة تشغيلات')}${sw(i,'er','تعديل وحذف التشغيلات')}</div><div class=mu>الأجهزة:</div>${Object.keys(d).map(k=>`<label class=sw><input type=checkbox data-a=${i}|bd|${k} ${(p.bd||[]).includes(k)?'checked':''}> حظر: ${esc(d[k].ua)} · آخر دخول ${new Date(d[k].last).toLocaleDateString('en-GB')}</label>`).join('')}</div>`}).join('')}
+return `<div class="card"><b>${esc(VW[i].name||'زائر')}</b> <span class=mu>${esc(VW[i].email||'')} ${p.on?'':'· بانتظار الموافقة'}</span><div style="margin:6px 0">${sw(i,'on','دخول التطبيق')}${sw(i,'sp','رؤية الأسعار والتكاليف والأرباح')}${sw(i,'ep','تعديل الأسعار')}${sw(i,'ar','إضافة تشغيلات')}${sw(i,'er','تعديل وحذف التشغيلات')}${sw(i,'st','إدارة المخازن (وارد / صرف / تسوية)')}</div><div class=mu>الأجهزة:</div>${Object.keys(d).map(k=>`<label class=sw><input type=checkbox data-a=${i}|bd|${k} ${(p.bd||[]).includes(k)?'checked':''}> حظر: ${esc(d[k].ua)} · آخر دخول ${new Date(d[k].last).toLocaleDateString('en-GB')}</label>`).join('')}</div>`}).join('')}
 document.addEventListener('change',e=>{const q=e.target.dataset.a;if(!q||!ME.owner)return;const[i,k,d]=q.split('|'),p={...(PM[i]||{})};
 if(k=='bd'){const s=new Set(p.bd||[]);e.target.checked?s.add(d):s.delete(d);p.bd=[...s]}else p[k]=e.target.checked;
 PM[i]=p;later('p'+i,()=>DB.doc('perms/'+i).set(JSON.parse(JSON.stringify(p))))});
+/* ===== المخازن: خام + منتج تام ===== */
+const DEF_DEST=['المصنع الجديد','التبطين','بيع','مخلفات','هالك'],
+dests=()=>(SC.dests&&SC.dests.length)?SC.dests:DEF_DEST,
+val=i=>{const e=document.getElementById(i);return e?e.value:''},num=i=>+val(i)||0,
+today=()=>new Date().toISOString().slice(0,10),
+  shId=()=>(P('shell')[0]||{id:'sh'}).id,
+fx=x=>n(x,2),
+KL={purchase:'وارد خام',open:'رصيد افتتاحي',adj:'تسوية جرد',issue:'صرف',manual:'وارد يدوي'},
+nextNo=()=>S.runs.reduce((a,r)=>Math.max(a,r.no||0),0)+1;
+function mvLabel(v){const nt=v.note?' · '+v.note:'';
+if(v.kind=='issue')return 'صرف إلى '+(v.dest||'—')+nt;
+if(v.kind=='adj')return 'تسوية جرد '+(v.dir=='in'?'(زيادة)':'(عجز)')+nt;
+return (KL[v.kind]||'حركة')+nt}
+function ledger(st){const L={},start=SC.start||'';
+const ensure=(id,nm)=>(L[id]=L[id]||{n:nm||id,rows:[]});
+(st=='raw'?P('raw'):P('prod').concat(P('shell'))).forEach(x=>ensure(x.id,x.name));
+S.runs.forEach(r=>{if((r.date||'')<start)return;const no=r.no||'؟';
+if(st=='raw'){if(r.raw>0&&r.rawId)ensure(r.rawId,r.rawN).rows.push({d:r.date,ts:r.id,out:r.raw,t:'سحب لتشغيلة رقم '+no+(r.note?' · '+r.note:'')})}
+else{r.prods.forEach(x=>{if(x.kg>0)ensure(x.id,x.n).rows.push({d:r.date,ts:r.id,in:x.kg,t:'ناتج تشغيلة رقم '+no})});
+if(r.shell>0)ensure(shId(),'قشر').rows.push({d:r.date,ts:r.id,in:r.shell,t:'ناتج تشغيلة رقم '+no})}});
+Object.values(MV).filter(v=>v.st==st).forEach(v=>ensure(v.item,v.n).rows.push({d:v.date,ts:v.ts||0,in:v.dir=='in'?v.qty:0,out:v.dir=='out'?v.qty:0,t:mvLabel(v),mv:v}));
+Object.values(L).forEach(it=>{it.rows.sort((a,b)=>(a.d||'').localeCompare(b.d||'')||a.ts-b.ts);let b=0,i=0,o=0;
+it.rows.forEach(r=>{i+=r.in||0;o+=r.out||0;b+=(r.in||0)-(r.out||0);r.b=b});it.in=i;it.out=o;it.bal=b});
+return L}
+function stockRows(st){const A=[['الصنف','التاريخ','البيان','وارد','منصرف','الرصيد']];
+Object.values(ledger(st)).forEach(it=>it.rows.forEach(r=>A.push([it.n,r.d,r.t,r.in||0,r.out||0,r.b].map(rnd))));return A}
+function rr(){const op=[...document.querySelectorAll('#v details[open]')].map(d=>d.id).filter(Boolean);show();
+op.forEach(i=>{const d=document.getElementById(i);if(d)d.open=true})}
+const smsg=t=>{const e=$('#sm');if(e)e.textContent=t};
+async function putMove(v){try{await FS.doc('moves/'+v.id).set(cl(v));return 1}
+catch(e){smsg('تعذر الحفظ. تأكد من صلاحية إدارة المخازن ومن قواعد Firestore.');return 0}}
+async function stAdd(o){const q=+o.qty;
+if(!(q>0)){smsg('اكتب كمية أكبر من صفر.');return 0}
+if(!o.item){smsg('اختار الصنف.');return 0}
+const L=ledger(o.st),v={id:'m'+Date.now(),ts:Date.now(),st:o.st,item:o.item,n:(L[o.item]||{}).n||'',dir:o.dir,qty:q,kind:o.kind,date:o.date||today(),note:o.note||'',dest:o.dest||''};
+if(await putMove(v)){rr();return 1}return 0}
+async function delMove(id,b){if(!b.dataset.s){b.dataset.s=1;b.textContent='تأكيد؟';return}
+try{await FS.doc('moves/'+id).delete()}catch(e){smsg('تعذر الحذف.')}}
+async function saveEdit(id){const v=MV[id];if(!v)return;const q=num('e_q');
+if(!(q>0)){smsg('اكتب كمية أكبر من صفر.');return}
+const o={...v,date:val('e_d')||v.date,qty:q,note:val('e_n')};if(v.kind=='issue'&&val('e_x'))o.dest=val('e_x');
+if(await putMove(o)){EM='';rr()}}
+function editRow(v){const ds=dests(),dl=ds.includes(v.dest)?ds:ds.concat(v.dest||[]);
+return `<tr><td colspan="6"><div class="g2"><label>التاريخ<input type="date" id="e_d" value="${v.date}"></label><label>الكمية (كجم)<input type="number" step="any" id="e_q" value="${v.qty}"></label>${v.kind=='issue'?`<label>الاتجاه<select id="e_x">${dl.map(d=>`<option ${d==v.dest?'selected':''}>${esc(d)}</option>`).join('')}</select></label>`:''}<label>ملاحظة<input id="e_n" value="${esc(v.note||'')}"></label></div><button class="save" onclick="saveEdit('${v.id}')">حفظ التعديل</button> <button class="add" onclick="EM='';rr()">إلغاء</button>`}
+function movRows(it){return it.rows.map(r=>{const mv=r.mv;if(mv&&EM==mv.id)return editRow(mv);
+const act=mv&&CAN_ST?`<td><button class="sm" onclick="EM='${mv.id}';rr()">✎</button> <button class="sm d" onclick="delMove('${mv.id}',this)">✕</button>`:'<td>';
+return `<tr><td>${esc(r.d||'')}<td>${esc(r.t)}<td>${r.in?fx(r.in):''}<td>${r.out?fx(r.out):''}<td class="${r.b<0?'bad':''}">${fx(r.b)}${act}`}).join('')}
+const cardD=(st,id,it)=>`<details class="card" id="k_${st}_${id}"><summary>${esc(it.n)} · الرصيد <span class="${it.bal<0?'bad':'ok'}">${fx(it.bal)} كجم</span></summary><div class="tw"><table><tr><th>التاريخ<th>البيان<th>وارد<th>منصرف<th>الرصيد<th>${movRows(it)}<tr><td><b>الإجمالي</b><td><td>${fx(it.in)}<td>${fx(it.out)}<td>${fx(it.bal)}<td></table></div>${it.rows.length?'':'<p class="mu">لا توجد حركات لسه.</p>'}</details>`;
+async function writeCfg(){try{await FS.doc('stockcfg/main').set(cl({dests:dests(),start:SC.start||''}));return 1}
+catch(e){smsg('تعذر حفظ الإعدادات. تأكد من قواعد Firestore وصلاحية المخازن.');return 0}}
+async function setStart(){const o=SC;SC={...SC,start:val('cf_s')};if(!await writeCfg())SC=o}
+async function addDest(){const nm=val('dn').trim();if(!nm||dests().includes(nm))return;const o=SC;SC={...SC,dests:dests().concat(nm)};if(await writeCfg())rr();else SC=o}
+async function delDest(i){const o=SC,a=dests().slice();a.splice(i,1);SC={...SC,dests:a};if(await writeCfg())rr();else SC=o}
+const cfgH=()=>CAN_ST?`<div class="card"><h3>تاريخ بدء المخازن</h3><p class="mu">التشغيلات قبل التاريخ ده مش بتتحسب في المخازن. سجّل الأرصدة الافتتاحية الفعلية بنفس التاريخ.${SC.start?'':' <b class="bad">لسه مش محدد: كل التشغيلات القديمة بتتحسب وهتظهر الأرصدة بالسالب.</b>'}</p><div style="display:flex;gap:6px"><input type="date" id="cf_s" value="${SC.start||''}"><button class="sm" onclick="setStart()">حفظ</button></div></div>`:'';
+const optI=(L,ids)=>ids.map(i=>`<option value="${i}">${esc(L[i].n)}</option>`).join('');
+function rawsH(){const L=ledger('raw'),ids=Object.keys(L),opt=optI(L,ids);
+let h='<p id="sm" class="bad"></p>'+cfgH()+`<div class="card"><h3>أرصدة مخزن الخام</h3><div class="grid">${ids.map(i=>`<div class="${L[i].bal<0?'bad':''}"><b>${fx(L[i].bal)} كجم</b>${esc(L[i].n)}</div>`).join('')}</div>${ids.length?'':'<p class="mu">أضف نوع خام من شاشة الأسعار.</p>'}</div>`;
+if(CAN_ST)h+=`<div class="card"><h3>تسجيل وارد خام</h3><div class="g2"><label>التاريخ<input type="date" id="ri_d" value="${today()}"></label><label>نوع الخام<select id="ri_i">${opt}</select></label><label>الكمية (كجم)<input type="number" step="any" id="ri_q"></label><label>نوع الحركة<select id="ri_k"><option value="purchase">وارد جديد</option><option value="open">رصيد افتتاحي</option></select></label></div><label>المورد / ملاحظة<input id="ri_n"></label><button class="save" onclick="rawIn()">حفظ الوارد</button></div>
+<details class="card" id="k_adjraw"><summary>تسوية / جرد فعلي</summary><div class="g2" style="margin-top:8px"><label>التاريخ<input type="date" id="ra_d" value="${today()}"></label><label>نوع الخام<select id="ra_i">${opt}</select></label><label>النوع<select id="ra_t"><option value="in">زيادة</option><option value="out">عجز</option></select></label><label>الكمية (كجم)<input type="number" step="any" id="ra_q"></label></div><label>ملاحظة<input id="ra_n"></label><button class="save" onclick="rawAdj()">حفظ التسوية</button></details>`;
+return h+ids.map(i=>cardD('raw',i,L[i])).join('')}
+const rawIn=()=>stAdd({st:'raw',item:val('ri_i'),dir:'in',qty:val('ri_q'),kind:val('ri_k'),date:val('ri_d'),note:val('ri_n')}),
+rawAdj=()=>stAdd({st:'raw',item:val('ra_i'),dir:val('ra_t'),qty:val('ra_q'),kind:'adj',date:val('ra_d'),note:val('ra_n')});
+function fgH(){const L=ledger('fg'),ids=Object.keys(L),DS=dests(),T=k=>ids.reduce((a,i)=>a+L[i][k],0),
+iss=Object.values(MV).filter(v=>v.st=='fg'&&v.kind=='issue'),tot={};
+iss.forEach(v=>{const o=tot[v.item]=tot[v.item]||{};o[v.dest]=(o[v.dest]||0)+v.qty});
+const dl=[...new Set(DS.concat(iss.map(v=>v.dest)))],withI=ids.filter(i=>tot[i]),
+optB=ids.map(i=>`<option value="${i}">${esc(L[i].n)} (${fx(L[i].bal)})</option>`).join(''),dopt=DS.map(d=>`<option>${esc(d)}</option>`).join('');
+let h='<p id="sm" class="bad"></p>'+cfgH()+`<div class="card"><h3>رصيد مخزن المنتج التام</h3><div class="tw"><table><tr><th>الصنف<th>وارد<th>منصرف<th>الرصيد${ids.map(i=>`<tr><td>${esc(L[i].n)}<td>${fx(L[i].in)}<td>${fx(L[i].out)}<td class="${L[i].bal<0?'bad':'ok'}"><b>${fx(L[i].bal)}</b>`).join('')}<tr><td><b>الإجمالي</b><td>${fx(T('in'))}<td>${fx(T('out'))}<td><b>${fx(T('bal'))}</b></table></div>${ids.length?'':'<p class="mu">أضف أصناف من شاشة الأسعار.</p>'}</div>`;
+if(CAN_ST)h+=`<div class="card"><h3>صرف من المخزن</h3><div class="g2"><label>التاريخ<input type="date" id="fi_d" value="${today()}"></label><label>الصنف (الرصيد)<select id="fi_i">${optB}</select></label><label>الكمية (كجم)<input type="number" step="any" id="fi_q"></label><label>الاتجاه<select id="fi_x">${dopt}</select></label></div><label>ملاحظة<input id="fi_n"></label><button class="save" onclick="fgIssue()">تسجيل الصرف</button></div>
+<details class="card" id="k_fgin"><summary>إضافة كمية / تسوية جرد</summary><div class="g2" style="margin-top:8px"><label>التاريخ<input type="date" id="fm_d" value="${today()}"></label><label>الصنف<select id="fm_i">${optB}</select></label><label>النوع<select id="fm_t"><option value="manual">وارد يدوي</option><option value="adj-in">تسوية زيادة</option><option value="adj-out">تسوية عجز</option></select></label><label>الكمية (كجم)<input type="number" step="any" id="fm_q"></label></div><label>ملاحظة<input id="fm_n"></label><button class="save" onclick="fgIn()">حفظ</button></details>`;
+h+=`<div class="card"><h3>ملخص اتجاهات الصرف</h3>${withI.length?`<div class="tw"><table><tr><th>الصنف${dl.map(d=>`<th>${esc(d)}`).join('')}<th>الإجمالي${withI.map(i=>`<tr><td>${esc(L[i].n)}${dl.map(d=>`<td>${tot[i][d]?fx(tot[i][d]):''}`).join('')}<td><b>${fx(Object.values(tot[i]).reduce((a,b)=>a+b,0))}</b>`).join('')}<tr><td><b>الإجمالي</b>${dl.map(d=>`<td><b>${fx(withI.reduce((a,i)=>a+(tot[i][d]||0),0))}</b>`).join('')}<td><b>${fx(iss.reduce((a,v)=>a+v.qty,0))}</b></table></div>`:'<p class="mu">لسه مفيش صرف متسجل.</p>'}</div>`;
+h+=`<div class="card"><h3>اتجاهات الصرف</h3>${DS.map((d,i)=>`<span class="pill">${esc(d)} ${CAN_ST?`<a href="#" class="bad" onclick="delDest(${i});return false">✕</a>`:''}</span>`).join('')}${CAN_ST?`<div style="display:flex;gap:6px;margin-top:8px"><input id="dn" placeholder="اتجاه جديد"><button class="sm" onclick="addDest()">إضافة</button></div>`:''}</div>`;
+return h+ids.map(i=>cardD('fg',i,L[i])).join('')}
+async function fgIssue(){const i=val('fi_i'),q=num('fi_q'),L=ledger('fg');
+if(i&&L[i]&&q>L[i].bal+1e-9){smsg('الكمية أكبر من رصيد الصنف ('+fx(L[i].bal)+' كجم).');return}
+if(!val('fi_x')){smsg('اختار الاتجاه.');return}
+stAdd({st:'fg',item:i,dir:'out',qty:q,kind:'issue',dest:val('fi_x'),date:val('fi_d'),note:val('fi_n')})}
+const fgIn=()=>{const t=val('fm_t');return stAdd({st:'fg',item:val('fm_i'),dir:t=='adj-out'?'out':'in',qty:val('fm_q'),kind:t=='manual'?'manual':'adj',date:val('fm_d'),note:val('fm_n')})};
+function rbal(){const e=$('#rbal');if(!e)return;const it=ledger('raw')[D.rawId];if(!it){e.textContent='';return}
+const a=it.bal,after=a-(D.raw||0);
+e.innerHTML='رصيد مخزن الخام: <b>'+fx(a)+'</b> كجم'+(D.raw>0?' · بعد التشغيلة: <b class="'+(after<0?'bad':'ok')+'">'+fx(after)+'</b>':'')+(after<0?' <span class="bad">الكمية أكبر من المخزن، سجّل الوارد الأول</span>':'')}
+function numberOld(){if(!ME.owner||mig)return;const L=Object.values(RM).filter(r=>!r.no);if(!L.length)return;mig=1;
+let k=Object.values(RM).reduce((a,r)=>Math.max(a,r.no||0),0);L.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.id-b.id);
+const b=FS.batch();L.forEach(r=>b.update(FS.doc('runs/'+r.id),{no:++k}));b.commit().catch(()=>{mig=0})}
 $('#v').innerHTML='<p class=mu>جاري التحميل…</p>';
 </script></body></html>
