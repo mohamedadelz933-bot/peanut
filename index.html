@@ -1,0 +1,193 @@
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>حسبة المقشرة</title>
+<style>
+:root{--bg:#faf7f2;--card:#fff;--tx:#2b2118;--mu:#7a6a5a;--ac:#b4621f;--bd:#e6dccf;--ok:#2e7d32;--bad:#c62828;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1713;--card:#272019;--tx:#f1e8dc;--mu:#a8998a;--ac:#e0914d;--bd:#3b3128;--ok:#6fcf74;--bad:#ff7b7b;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1c1713;--card:#272019;--tx:#f1e8dc;--mu:#a8998a;--ac:#e0914d;--bd:#3b3128;--ok:#6fcf74;--bad:#ff7b7b;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.6 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+main{max-width:720px;margin:auto;padding:12px}h1{font-size:20px;margin:6px 0 10px}h3{margin:0 0 8px;font-size:15px;color:var(--ac)}
+nav{display:flex;gap:6px;margin-bottom:10px}nav button{flex:1;padding:10px 4px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;font:inherit;cursor:pointer}nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:10px}
+label{display:block;font-size:13px;color:var(--mu);margin-bottom:8px}
+input,select{width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit;margin-top:2px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row{display:flex;gap:6px;margin-bottom:6px;align-items:center}.row input,.row select{margin:0}.row .num{width:84px;flex:none}.row select{width:118px;flex:none}
+.row button{border:0;background:none;color:var(--bad);font-size:18px;cursor:pointer}
+.add{width:100%;padding:8px;border:1px dashed var(--ac);background:none;color:var(--ac);border-radius:8px;font:inherit;cursor:pointer;margin-top:6px}
+.save{width:100%;padding:12px;border:0;background:var(--ac);color:#fff;border-radius:10px;font:inherit;font-weight:700;cursor:pointer}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.grid div{background:var(--bg);border-radius:8px;padding:8px;font-size:12px;color:var(--mu)}.grid b{display:block;font-size:15px;color:var(--tx)}
+.bad,.bad b{color:var(--bad)}.ok,.ok b{color:var(--ok)}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px 4px;border-bottom:1px solid var(--bd);text-align:right;white-space:nowrap}
+summary{cursor:pointer;font-weight:600}.mu{color:var(--mu);font-size:12px}.sw{display:flex;gap:8px;align-items:center;margin:4px 0;color:var(--tx);font-size:14px}.sw input{width:auto;margin:0}
+</style></head><body><main>
+<h1>🥜 حسبة المقشرة</h1>
+<nav><button data-t="new" onclick="tab='new';show()">تشغيلة جديدة</button><button data-t="runs" onclick="tab='runs';show()">السجل</button><button data-t="prices" onclick="tab='prices';show()">الأسعار</button><button data-t="acc" style="display:none" onclick="tab='acc';show()">الوصول</button></nav>
+<p id="st" class="bad"></p><div id="v"></div>
+<p class="mu" id="ft">البيانات بتتحفظ على نفس الجهاز والمتصفح اللي بتفتح منه.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';'),
+n=(x,d=1)=>isFinite(x)?(+x).toLocaleString('en-US',{maximumFractionDigits:d}):'-',m=x=>SP?n(x,2)+' ج':'•••';
+let S={alloc:'w',runs:[],prices:[
+{id:'raw1',name:'فول خام',t:'raw',p:45},
+{id:'g1',name:'فول نمرة 1',t:'prod',p:70},{id:'g2',name:'فول نمرة 2',t:'prod',p:60},
+{id:'g3',name:'فول نمرة 3',t:'prod',p:50},{id:'g4',name:'فول نمرة 4',t:'prod',p:40},
+{id:'sh',name:'قشر',t:'shell',p:3},
+{id:'c1',name:'عمالة',t:'cost',b:'kg',p:1.5},{id:'c2',name:'كهرباء وتشغيل الماكينة',t:'cost',b:'kg',p:0.6},{id:'c3',name:'تعبئة وتشوين',t:'cost',b:'run',p:50}]},tab='new';
+let DB=null,CAN_RUN=false,CAN_EDIT=false,CAN_ADD=false,ACC=false,SP=false,PERM=null,ME={},DID='',VW={},PM={},shown=0,got=0,pr=0,seeded=0,RM={},MN={},ITEMS=null,PR={},unM=null,unP=null,unR=null,unS=null;const timers={};
+try{const a=JSON.parse(localStorage.getItem('mq1a'));if(a&&a.alloc)S.alloc=a.alloc}catch(e){}
+const save=()=>{try{localStorage.setItem('mq1a',JSON.stringify({alloc:S.alloc}))}catch(e){}};
+const newD=()=>({date:new Date().toISOString().slice(0,10),note:'',rawId:'',rawP:0,raw:0,moist:10,soaked:0,outs:{},shell:0});
+let D=newD();
+const P=t=>S.prices.filter(x=>x.t==t);
+function mk(d){const r=P('raw').find(x=>x.id==d.rawId),sh=P('shell')[0];
+return{...d,rawN:r?r.name:'',prods:P('prod').map(x=>({id:x.id,n:x.name,p:x.p,kg:d.outs[x.id]||0})),shellP:sh?sh.p:0,costs:P('cost').map(x=>({n:x.name,b:x.b,p:x.p}))}}
+function calc(r){
+const soak=r.soaked>0?r.soaked:r.raw*(1+r.moist/100),moist=r.raw>0?(soak/r.raw-1)*100:0,
+kern=r.prods.reduce((a,x)=>a+x.kg,0),out=kern+r.shell,loss=soak-out,
+rawCost=r.raw*r.rawP,proc=r.costs.reduce((a,c)=>a+c.p*(c.b=='kg'?r.raw:1),0),cost=rawCost+proc,
+shellRev=r.shell*r.shellP,net=cost-shellRev,val=r.prods.reduce((a,x)=>a+x.kg*x.p,0),
+ps=r.prods.map(x=>{const w=S.alloc=='v'?(val?x.kg*x.p/val:0):(kern?x.kg/kern:0),c=net*w;return{...x,c,cpk:x.kg?c/x.kg:0}}),
+rev=val+shellRev;
+return{raw:r.raw,shell:r.shell,soak,moist,kern,out,loss,lossP:soak?loss/soak*100:0,lossC:soak?loss*cost/soak:0,rawCost,proc,cost,net,avg:kern?net/kern:0,rev,profit:rev-cost,ps,shellRev}}
+function resHTML(c){
+const rows=c.ps.map(x=>`<tr><td>${esc(x.n)}<td>${n(x.kg)} (${n(c.raw?x.kg/c.raw*100:0)}%)<td>${m(x.c)}<td>${m(x.cpk)}<td class="${x.p-x.cpk<0?'bad':'ok'}">${m(x.p-x.cpk)}`).join('');
+return `<div class="grid">
+<div><b>${n(c.soak)} كجم</b>بعد النقع (رطوبة ${n(c.moist)}%)</div>
+<div><b>${n(c.out)} كجم</b>إجمالي الناتج (${n(c.raw?c.out/c.raw*100:0)}% من الخام)</div>
+<div class="${c.lossP>8||c.loss<0?'bad':''}"><b>${n(c.loss)} كجم · ${n(c.lossP)}%</b>الفقد</div>
+<div><b>${m(c.lossC)}</b>تكلفة الفقد (تقريبي)</div>
+<div><b>${m(c.cost)}</b>إجمالي تكلفة التشغيلة</div>
+<div><b>${m(c.avg)}</b>متوسط تكلفة كجم الفول المقشر</div>
+<div><b>${m(c.rev)}</b>إجمالي البيع المتوقع</div>
+<div class="${c.profit<0?'bad':'ok'}"><b>${m(c.profit)}</b>صافي الربح</div></div>
+${c.loss<0?'<p class="bad">الناتج أكبر من وزن الفول بعد النقع. زوّد نسبة الرطوبة أو اكتب الوزن الفعلي بعد النقع.</p>':''}
+<div class="tw"><table><tr><th>الصنف<th>كجم (% من الخام)<th>إجمالي التكلفة<th>تكلفة الكجم<th>ربح الكجم${rows}<tr><td><b>الإجمالي</b><td>${n(c.kern)}<td>${m(c.net)}<td>${m(c.avg)}<td><tr><td>قشر (إيراد)<td>${n(c.shell)} (${n(c.raw?c.shell/c.raw*100:0)}%)<td>—<td>—<td>${m(c.shellRev)}</table></div>
+<p class="mu">الخام ${m(c.rawCost)} + تشغيل ${m(c.proc)} − إيراد القشر ${m(c.shellRev)} = ${m(c.net)} بتتوزع على الأصناف.</p>
+<label>توزيع التكلفة على الأصناف<select onchange="setAlloc(this.value)"><option value="w" ${S.alloc=='w'?'selected':''}>بالوزن (نفس تكلفة الكجم)</option><option value="v" ${S.alloc=='v'?'selected':''}>بالقيمة (حسب سعر البيع)</option></select></label>`}
+function setAlloc(v){S.alloc=v;save();show()}
+function formH(){
+const R=P('raw');if(!R.find(x=>x.id==D.rawId)&&R[0]){D.rawId=R[0].id;D.rawP=R[0].p}
+return `<div class="card"><div class="g2"><label>التاريخ<input type="date" data-k="date" value="${D.date}"></label><label>ملاحظة / المورد<input data-k="note" value="${esc(D.note)}"></label></div>
+<div class="g2"><label>نوع الخام<select onchange="pickRaw(this.value)">${R.map(x=>`<option value="${x.id}" ${x.id==D.rawId?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label><label style="${SP?'':'display:none'}">سعر كجم الخام<input id="rp" type="number" step="any" data-k="rawP" value="${D.rawP}"></label></div>
+<div class="g2"><label>كمية الخام (كجم)<input type="number" step="any" data-k="raw" value="${D.raw||''}"></label><label>رطوبة النقع التقديرية %<input type="number" step="any" data-k="moist" value="${D.moist}"></label></div>
+<label>وزن الفول بعد النقع الفعلي (اختياري، لو كتبته بيلغي التقدير)<input type="number" step="any" data-k="soaked" value="${D.soaked||''}"></label></div>
+<div class="card"><h3>المخرجات (كجم)</h3><div class="g2">${P('prod').map(x=>`<label>${esc(x.name)}<input type="number" step="any" data-k="o_${x.id}" value="${D.outs[x.id]||''}"></label>`).join('')}<label>القشر<input type="number" step="any" data-k="shell" value="${D.shell||''}"></label></div></div>
+<div class="card" id="res"></div><p id="msg" class="bad"></p><button class="save" onclick="saveRun()">حفظ التشغيلة</button>`}
+function upd(){$('#res').innerHTML=resHTML(calc(mk(D)))}
+function pickRaw(id){D.rawId=id;D.rawP=S.prices.find(x=>x.id==id).p;$('#rp').value=D.rawP;upd()}
+async function saveRun(){if(!(D.raw>0)){$('#msg').textContent='اكتب كمية الخام الأول.';return}
+const r={...mk(D),id:Date.now()};
+try{const{main,mon}=split(r),b=FS.batch();b.set(FS.doc('runs/'+r.id),main);if(SP)b.set(FS.doc('money/'+r.id),mon);await b.commit()}catch(e){$('#msg').textContent='تعذر الحفظ في السحابة. تأكد من صلاحية الكتابة وجرب مرة أخرى.';return}
+const{date,moist,rawId,rawP}=D;D=newD();Object.assign(D,{date,moist,rawId,rawP});tab='runs';show()}
+function runsH(){const L=S.runs;if(!L.length)return '<div class="card">لسه مفيش تشغيلات متسجلة.</div>';
+const C=L.map(calc),T=k=>C.reduce((a,c)=>a+c[k],0);
+return `<div class="card" id="tot"><h3>إجمالي ${L.length} تشغيلة</h3><div class="grid"><div><b>${n(L.reduce((a,r)=>a+r.raw,0))} كجم</b>خام</div><div><b>${n(T('loss')/T('soak')*100)}%</b>متوسط الفقد</div><div><b>${m(T('cost'))}</b>إجمالي التكلفة</div><div class="${T('profit')<0?'bad':'ok'}"><b>${m(T('profit'))}</b>إجمالي الربح</div></div><button class="save" id="xb" onclick="exportX()" style="display:${DL&&SP?'block':'none'}">⬇ تصدير كل التشغيلات إكسيل</button><p id="xm" class="mu"></p></div>`+
+L.map((r,i)=>`<details class="card" id="d${r.id}"><summary id="s${r.id}">${sumT(r,C[i])}</summary><br><div id="r${r.id}">${resHTML(C[i])}</div>${SP&&CAN_EDIT?editH(r):''}<button class="add" onclick="delRun(${r.id},this)">حذف التشغيلة</button></details>`).join('')}
+async function delRun(id,b){if(!b.dataset.s){b.dataset.s=1;b.textContent='اضغط تاني للتأكيد';return}
+try{const bt=FS.batch();bt.delete(FS.doc('runs/'+id));if(SP)bt.delete(FS.doc('money/'+id));await bt.commit()}catch(e){b.textContent='تعذر الحذف'}}
+function priceH(){
+const sec=(t,title)=>`<div class="card"><h3>${title}</h3>${P(t).map(x=>`<div class="row"><input value="${esc(x.name)}" data-p="${x.id}:name"><input class="num" type="number" step="any" value="${x.p}" data-p="${x.id}:p">${t=='cost'?`<select data-p="${x.id}:b"><option value="kg" ${x.b=='kg'?'selected':''}>لكل كجم خام</option><option value="run" ${x.b=='run'?'selected':''}>لكل تشغيلة</option></select>`:''}${t=='shell'?'':`<button onclick="delP('${x.id}')">✕</button>`}</div>`).join('')}${t=='shell'?'':`<button class="add" onclick="addP('${t}')">+ إضافة</button>`}</div>`;
+return `<p class="mu">الأسعار دي أرقام مبدئية، عدّلها على أسعارك. التشغيلات المتسجلة بتحتفظ بأسعارها وقت التسجيل.</p>`+sec('raw','أنواع الخام (سعر شراء الكجم)')+sec('prod','الأصناف الناتجة (سعر بيع الكجم)')+sec('shell','القشر (سعر بيع الكجم)')+sec('cost','تكاليف التشغيل')}
+function addP(t){S.prices.push({id:'x'+Date.now(),name:t=='raw'?'خام جديد':t=='prod'?'صنف جديد':'تكلفة جديدة',t,p:0,b:'kg'});save();pushPrices();show()}
+function delP(id){S.prices=S.prices.filter(x=>x.id!=id);save();pushPrices();show()}
+function show(){document.querySelector('nav').style.display=DB&&!ACC?'none':'';
+if(DB&&!ACC){$('#v').innerHTML=lockH();return}
+if(tab=='prices'&&!SP||tab=='acc'&&!ME.owner)tab='new';
+document.querySelectorAll('nav button').forEach(b=>{b.classList.toggle('on',b.dataset.t==tab);if(b.dataset.t=='prices')b.style.display=SP?'':'none';if(b.dataset.t=='acc')b.style.display=ME.owner?'':'none'});
+$('#v').innerHTML=tab=='new'?formH():tab=='runs'?runsH():tab=='acc'?accH():priceH();if(tab=='new')upd();
+const off=s=>document.querySelectorAll(s).forEach(e=>e.disabled=true);
+if(tab=='new'&&!CAN_ADD)off('#v .save');
+if(tab=='runs'&&!CAN_RUN)off('#v [data-r],#v .add');
+if(tab=='prices'&&!CAN_EDIT){off('#v input,#v select,#v button');$('#v').insertAdjacentHTML('afterbegin','<p class=mu>تعديل الأسعار للمحرّر أو المالك فقط.</p>')}}
+const onIn=e=>{const t=e.target,k=t.dataset.k,p=t.dataset.p;
+if(k){const v=t.value;if(k.startsWith('o_'))D.outs[k.slice(2)]=+v||0;else D[k]=t.type=='number'?(+v||0):v;upd()}
+else if(p){const[id,f]=p.split(':'),x=S.prices.find(y=>y.id==id);if(x){x[f]=f=='p'?(+t.value||0):t.value;save();pushPrices()}}};
+const sumT=(r,c)=>`${r.date} · ${esc(r.rawN||'')} ${esc(r.note)} · ${n(r.raw)} كجم · ربح ${m(c.profit)}`,
+editH=r=>`<details style="margin-top:8px"><summary class="mu">تعديل أسعار التشغيلة دي</summary><div class="g2" style="margin-top:8px"><label>سعر كجم الخام<input type="number" step="any" data-r="${r.id}:rawP" value="${r.rawP}"></label>${r.prods.map((x,i)=>`<label>${esc(x.n)}<input type="number" step="any" data-r="${r.id}:p:${i}" value="${x.p}"></label>`).join('')}<label>القشر<input type="number" step="any" data-r="${r.id}:shellP" value="${r.shellP}"></label>${r.costs.map((x,i)=>`<label>${esc(x.n)} (${x.b=='kg'?'لكل كجم خام':'لكل تشغيلة'})<input type="number" step="any" data-r="${r.id}:c:${i}" value="${x.p}"></label>`).join('')}</div></details>`;
+document.addEventListener('input',e=>{const q=e.target.dataset.r;if(!q)return;
+const[id,f,i]=q.split(':'),r=S.runs.find(x=>x.id==id),v=+e.target.value||0;if(!r)return;
+if(f=='rawP')r.rawP=v;else if(f=='shellP')r.shellP=v;else if(f=='p')r.prods[i].p=v;else if(f=='c')r.costs[i].p=v;
+save();pushRun(r);const c=calc(r);$('#r'+id).innerHTML=resHTML(c);$('#s'+id).innerHTML=sumT(r,c);
+const tmp=document.createElement('div');tmp.innerHTML=runsH();$('#tot').innerHTML=tmp.firstElementChild.innerHTML});
+document.addEventListener('input',onIn);document.addEventListener('change',onIn);
+let DL={save:({filename:f,data:d})=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([d],{type:'application/octet-stream'}));a.download=f;a.click()}};
+const rnd=v=>typeof v=='number'?Math.round(v*100)/100:v;
+async function exportX(){const xm=$('#xm');xm.textContent='';
+try{if(!window.XLSX||!DL){xm.textContent='التصدير مش جاهز دلوقتي، جرب تاني بعد ثانية.';return}
+const W=XLSX.utils,C=S.runs.map(calc),sh=r=>{const w=W.aoa_to_sheet(r);w['!cols']=r[0].map(()=>({wch:17}));return w},
+a=[['التاريخ','ملاحظة / المورد','نوع الخام','الخام كجم','سعر كجم الخام','رطوبة %','كجم بعد النقع','إجمالي الناتج كجم','قشر كجم','الفقد كجم','الفقد %','تكلفة الفقد','تكلفة الخام','تكلفة التشغيل','إجمالي التكلفة','إيراد القشر','إجمالي البيع','صافي الربح']],
+b=[['التاريخ','ملاحظة / المورد','الصنف','كجم','% من الخام','سعر بيع الكجم','إجمالي التكلفة','تكلفة الكجم','ربح الكجم','ربح الصنف']];
+S.runs.forEach((r,i)=>{const c=C[i];
+a.push([r.date,r.note,r.rawN,r.raw,r.rawP,c.moist,c.soak,c.out,c.shell,c.loss,c.lossP,c.lossC,c.rawCost,c.proc,c.cost,c.shellRev,c.rev,c.profit].map(rnd));
+c.ps.forEach(x=>b.push([r.date,r.note,x.n,x.kg,r.raw?x.kg/r.raw*100:0,x.p,x.c,x.cpk,x.p-x.cpk,x.kg*(x.p-x.cpk)].map(rnd)));
+b.push([r.date,r.note,'قشر (إيراد)',r.shell,r.raw?r.shell/r.raw*100:0,r.shellP,'','','',c.shellRev].map(rnd))});
+const T={raw:'خام',prod:'صنف ناتج',shell:'قشر',cost:'تكلفة تشغيل'},
+p=[['النوع','الاسم','السعر','الحساب']].concat(S.prices.map(x=>[T[x.t],x.name,x.p,x.t=='cost'?(x.b=='kg'?'لكل كجم خام':'لكل تشغيلة'):'لكل كجم'])),
+wb=W.book_new();wb.Workbook={Views:[{RTL:true}]};
+W.book_append_sheet(wb,sh(a),'ملخص التشغيلات');W.book_append_sheet(wb,sh(b),'تفاصيل الأصناف');W.book_append_sheet(wb,sh(p),'الأسعار');
+await DL.save({filename:'peanut-runs-'+new Date().toISOString().slice(0,10)+'.xlsx',data:XLSX.write(wb,{bookType:'xlsx',type:'array'})});
+xm.textContent='تم تجهيز الملف.'}
+catch(e){if(!e||e.code!='declined')xm.textContent='معرفناش نجهز الملف، جرب تاني.'}}
+function later(k,f){clearTimeout(timers[k]);timers[k]=setTimeout(async()=>{try{await f()}catch(e){$('#st').textContent='تعذر حفظ آخر تعديل في السحابة.'}timers[k]=0},700)}
+function pushPrices(){later('set',async()=>{const items=S.prices.map(({p,...x})=>x),pm={};S.prices.forEach(x=>pm[x.id]=x.p);const b=FS.batch();b.set(FS.doc('settings/main'),cl({items}));if(SP)b.set(FS.doc('prices/main'),cl({p:pm}));await b.commit()})}
+function pushRun(r){later('r'+r.id,()=>FS.doc('money/'+r.id).set(split(r).mon))}
+function refresh(){const a=document.activeElement;if(a&&/INPUT|SELECT/.test(a.tagName)&&$('#v').contains(a))return;
+const op=[...document.querySelectorAll('#v details[open]')].map(d=>d.id).filter(Boolean);show();
+op.forEach(i=>{const d=document.getElementById(i);if(d)d.open=true})}
+const OWNER='mohamedadelz933@gmail.com',CFG={apiKey:"AIzaSyDZx5Sr8jIeCGq3DMyg8bhL0U7xd_PfJwQ",authDomain:"peanut-sheller.firebaseapp.com",projectId:"peanut-sheller",storageBucket:"peanut-sheller.firebasestorage.app",messagingSenderId:"889824132028",appId:"1:889824132028:web:99f88c7ef0587891c0c9b9"};
+firebase.initializeApp(CFG);const FS=firebase.firestore(),AU=firebase.auth();
+const cl=o=>JSON.parse(JSON.stringify(o));
+const split=r=>({main:cl({id:r.id,date:r.date,note:r.note,rawId:r.rawId,rawN:r.rawN,raw:r.raw,moist:r.moist,soaked:r.soaked,shell:r.shell,outs:r.outs,po:r.prods.map(x=>x.id),pn:Object.fromEntries(r.prods.map(x=>[x.id,x.n]))}),mon:cl({rawP:r.rawP,shellP:r.shellP,prods:Object.fromEntries(r.prods.map(x=>[x.id,x.p])),costs:r.costs})});
+function mergePrices(){if(ITEMS)S.prices=ITEMS.map(x=>({...x,p:PR[x.id]||0}))}
+function rebuild(){const cur=id=>(S.prices.find(x=>x.id==id)||{}).p||0,sh=P('shell')[0],old=S.runs;
+S.runs=Object.values(RM).map(m=>{if(timers['r'+m.id]){const x=old.find(y=>y.id==m.id);if(x)return x}
+const mo=MN[m.id];return{...m,rawP:mo?mo.rawP:cur(m.rawId),shellP:mo?mo.shellP:(sh?sh.p:0),
+prods:(m.po||[]).map(id=>({id,n:(m.pn||{})[id]||id,p:mo&&mo.prods?mo.prods[id]||0:cur(id),kg:(m.outs||{})[id]||0})),
+costs:mo&&mo.costs?mo.costs:P('cost').map(x=>({n:x.name,b:x.b,p:x.p}))}}).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.id-a.id)}
+function watch(){
+if(SP&&!unM){unM=FS.collection('money').onSnapshot(sn=>{MN={};sn.docs.forEach(d=>MN[d.id]=d.data());rebuild();if(shown)refresh()},()=>{});
+unP=FS.doc('prices/main').onSnapshot(sn=>{if(sn.metadata.hasPendingWrites||timers.set)return;PR=sn.exists?(sn.data().p||{}):{};mergePrices();rebuild();if(shown)refresh()},()=>{})}
+if(!SP&&unM){unM();unP();unM=unP=null;MN={};PR={};mergePrices();rebuild()}}
+function sync(){const st=$('#st');
+if(ACC&&!unR){unR=FS.collection('runs').onSnapshot(sn=>{RM={};sn.docs.forEach(d=>RM[d.id]=d.data());rebuild();got=1;st.textContent='';if(!shown&&pr){shown=1;show()}else if(shown)refresh()},
+e=>{st.textContent='تعذر قراءة التشغيلات: '+e.code;got=1;if(!shown&&pr){shown=1;show()}});
+unS=FS.doc('settings/main').onSnapshot(sn=>{if(sn.metadata.hasPendingWrites||timers.set)return;
+if(sn.exists){ITEMS=sn.data().items||[];mergePrices();rebuild()}else if(ME.owner&&!seeded){seeded=1;pushPrices()}
+if(shown)refresh()},()=>{})}
+if(!ACC&&unR){unR();unS();unR=unS=null;RM={};ITEMS=null;S.runs=[]}
+watch()}
+const loginH=()=>`<div class="card"><h3>🥜 حسبة المقشرة</h3><p>سجّل الدخول بحساب جوجل. الدخول بيتم بعد موافقة المالك.</p><button class="save" onclick="login()">الدخول بحساب جوجل</button></div>`;
+function login(){const pv=new firebase.auth.GoogleAuthProvider();AU.signInWithPopup(pv).catch(e=>{if(e.code=='auth/popup-blocked'||e.code=='auth/operation-not-supported-in-this-environment')AU.signInWithRedirect(pv);else if(e.code!='auth/popup-closed-by-user'&&e.code!='auth/cancelled-popup-request')$('#st').textContent='تعذر تسجيل الدخول: '+e.code})}
+AU.onAuthStateChanged(u=>{if(!u){DB=null;document.querySelector('nav').style.display='none';$('#v').innerHTML=loginH();return}boot(u)});
+async function boot(u){if(DB)return;DB=FS;
+ME={id:u.uid,owner:u.email==OWNER&&u.emailVerified,name:u.displayName||'',email:u.email||''};
+try{DID=localStorage.getItem('mqd')||'';if(!DID){DID=Math.random().toString(36).slice(2,8);localStorage.setItem('mqd',DID)}}catch(e){DID=DID||Math.random().toString(36).slice(2,8)}
+$('#ft').innerHTML='البيانات محفوظة في السحابة · '+esc(ME.email)+' · <a href="#" onclick="AU.signOut().then(()=>location.reload());return false">خروج</a>';
+applyPerm();
+if(ME.owner){pr=1;sync();
+FS.collection('viewers').onSnapshot(sn=>{VW={};sn.docs.forEach(d=>VW[d.id]=d.data());if(tab=='acc')refresh()},()=>{});
+FS.collection('perms').onSnapshot(sn=>{sn.docs.forEach(d=>{if(!timers['p'+d.id])PM[d.id]=cl(d.data())});if(tab=='acc')refresh()},()=>{})}
+else{FS.doc('perms/'+ME.id).onSnapshot(sn=>{const was=ACC,ws=SP;PERM=sn.exists?sn.data():null;applyPerm();sync();pr=1;
+if(!shown&&(!ACC||got)){shown=1;show()}else if(shown){was!=ACC||ws!=SP?show():refresh()}},e=>{$('#st').textContent='تعذر قراءة الصلاحيات: '+e.code});
+try{const r=FS.doc('viewers/'+ME.id),sn=await r.get(),d=sn.exists?sn.data():{},dv={...(d.devices||{})},o=dv[DID]||{};dv[DID]={ua:devName(),first:o.first||Date.now(),last:Date.now()};await r.set({name:ME.name,email:ME.email,devices:dv})}catch(e){}}}
+function applyPerm(){const p=PERM||{},o=ME.owner;ACC=o||(!!p.on&&!(p.bd||[]).includes(DID));SP=o||(ACC&&!!p.sp);CAN_EDIT=o||(ACC&&!!p.ep);CAN_ADD=o||(ACC&&!!p.ar);CAN_RUN=o||(ACC&&!!p.er)}
+const lockH=()=>`<div class="card"><h3>🔒 في انتظار موافقة المالك</h3><p>تم تسجيل طلبك بحساب <b>${esc(ME.email||'')}</b>. لما المالك يوافق، هتفتح لك الصفحة تلقائيا.</p><button class="add" onclick="AU.signOut().then(()=>location.reload())">تسجيل الخروج</button></div>`;
+const devName=()=>{const u=navigator.userAgent;return ((u.match(/iPhone|iPad|Android|Windows|Macintosh|Linux/)||['جهاز'])[0])+' · '+((u.match(/Edg|Firefox|Chrome|Safari/)||['متصفح'])[0])};
+function accH(){const ids=Object.keys(VW).filter(i=>i!=ME.id);
+if(!ids.length)return '<div class="card">لسه محدش سجّل دخول غيرك. أي شخص يدخل بحساب جوجل هيظهر هنا بانتظار موافقتك.</div>';
+const dv=ids.reduce((a,i)=>a+Object.keys(VW[i].devices||{}).length,0),
+sw=(i,k,l)=>`<label class=sw><input type=checkbox data-a=${i}|${k} ${(PM[i]||{})[k]?'checked':''}> ${l}</label>`;
+return `<div class="card"><h3>${ids.length} شخص · ${dv} جهاز</h3><p class=mu>أي شخص جديد بيظهر هنا من غير أي صلاحية لحد ما توافق عليه.</p></div>`+ids.map(i=>{const p=PM[i]||{},d=VW[i].devices||{};
+return `<div class="card"><b>${esc(VW[i].name||'زائر')}</b> <span class=mu>${esc(VW[i].email||'')} ${p.on?'':'· بانتظار الموافقة'}</span><div style="margin:6px 0">${sw(i,'on','دخول التطبيق')}${sw(i,'sp','رؤية الأسعار والتكاليف والأرباح')}${sw(i,'ep','تعديل الأسعار')}${sw(i,'ar','إضافة تشغيلات')}${sw(i,'er','تعديل وحذف التشغيلات')}</div><div class=mu>الأجهزة:</div>${Object.keys(d).map(k=>`<label class=sw><input type=checkbox data-a=${i}|bd|${k} ${(p.bd||[]).includes(k)?'checked':''}> حظر: ${esc(d[k].ua)} · آخر دخول ${new Date(d[k].last).toLocaleDateString('en-GB')}</label>`).join('')}</div>`}).join('')}
+document.addEventListener('change',e=>{const q=e.target.dataset.a;if(!q||!ME.owner)return;const[i,k,d]=q.split('|'),p={...(PM[i]||{})};
+if(k=='bd'){const s=new Set(p.bd||[]);e.target.checked?s.add(d):s.delete(d);p.bd=[...s]}else p[k]=e.target.checked;
+PM[i]=p;later('p'+i,()=>DB.doc('perms/'+i).set(JSON.parse(JSON.stringify(p))))});
+$('#v').innerHTML='<p class=mu>جاري التحميل…</p>';
+</script></body></html>
