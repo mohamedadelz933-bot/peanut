@@ -145,7 +145,7 @@ const cl=o=>JSON.parse(JSON.stringify(o));
 const split=r=>({main:cl({id:r.id,no:r.no,date:r.date,note:r.note,rawId:r.rawId,rawN:r.rawN,raw:r.raw,moist:r.moist,soaked:r.soaked,shell:r.shell,outs:r.outs,po:r.prods.map(x=>x.id),pn:Object.fromEntries(r.prods.map(x=>[x.id,x.n]))}),mon:cl({rawP:r.rawP,shellP:r.shellP,prods:Object.fromEntries(r.prods.map(x=>[x.id,x.p])),costs:r.costs})});
 function mergePrices(){if(ITEMS)S.prices=ITEMS.map(x=>({...x,p:PR[x.id]||0}))}
 function rebuild(){const cur=id=>(S.prices.find(x=>x.id==id)||{}).p||0,sh=P('shell')[0],old=S.runs;
-S.runs=Object.values(RM).map(m=>{if(timers['r'+m.id]){const x=old.find(y=>y.id==m.id);if(x)return x}
+                   S.runs=Object.values(RM).map(m=>{if(timers['r'+m.id]){const x=old.find(y=>y.id==m.id);if(x)return x}
 const mo=MN[m.id];return{...m,rawP:mo?mo.rawP:cur(m.rawId),shellP:mo?mo.shellP:(sh?sh.p:0),
 prods:(m.po||[]).map(id=>({id,n:(m.pn||{})[id]||id,p:mo&&mo.prods?mo.prods[id]||0:cur(id),kg:(m.outs||{})[id]||0})),
 costs:mo&&mo.costs?mo.costs:P('cost').map(x=>({n:x.name,b:x.b,p:x.p}))}}).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.id-a.id)}
@@ -201,7 +201,7 @@ today=()=>lt(new Date()),
   shId=()=>(P('shell')[0]||{id:'sh'}).id,
 fx=x=>n(x,2),
 KL={purchase:'وارد خام',open:'رصيد افتتاحي',adj:'تسوية جرد',issue:'صرف',manual:'وارد يدوي'},
-nextNo=()=>S.runs.reduce((a,r)=>Math.max(a,r.no||0),0)+1;
+nextNo=()=>Math.max(SC.noBase||0,S.runs.reduce((a,r)=>Math.max(a,r.no||0),0))+1;
 function mvLabel(v){const nt=v.note?' · '+v.note:'';
 if(v.kind=='issue')return 'صرف إلى '+(v.dest||'—')+nt;
 if(v.kind=='adj')return 'تسوية جرد '+(v.dir=='in'?'(زيادة)':'(عجز)')+nt;
@@ -241,7 +241,7 @@ function movRows(it){return it.rows.map(r=>{const mv=r.mv;if(mv&&EM==mv.id)retur
 const act=mv&&CAN_ST?`<td><button class="sm" onclick="EM='${mv.id}';rr()">✎</button> <button class="sm d" onclick="delMove('${mv.id}',this)">✕</button>`:'<td>';
 return `<tr><td>${esc(r.d||'')}<td>${esc(r.t)}<td>${r.in?fx(r.in):''}<td>${r.out?fx(r.out):''}<td class="${r.b<0?'bad':''}">${fx(r.b)}${act}`}).join('')}
 const cardD=(st,id,it)=>`<details class="card" id="k_${st}_${id}"><summary>${esc(it.n)} · الرصيد <span class="${it.bal<0?'bad':'ok'}">${fx(it.bal)} كجم</span></summary><div class="tw"><table><tr><th>التاريخ<th>البيان<th>وارد<th>منصرف<th>الرصيد<th>${movRows(it)}<tr><td><b>الإجمالي</b><td><td>${fx(it.in)}<td>${fx(it.out)}<td>${fx(it.bal)}<td></table></div>${it.rows.length?'':'<p class="mu">لا توجد حركات لسه.</p>'}</details>`;
-async function writeCfg(){try{await FS.doc('stockcfg/main').set(cl({dests:dests(),start:SC.start||''}));return 1}
+async function writeCfg(){try{await FS.doc('stockcfg/main').set(cl({dests:dests(),start:SC.start||'',noBase:SC.noBase||0}));return 1}
 catch(e){smsg('تعذر حفظ الإعدادات. تأكد من قواعد Firestore وصلاحية المخازن.');return 0}}
 async function setStart(){const o=SC;SC={...SC,start:val('cf_s')};if(!await writeCfg())SC=o}
 async function addDest(){const nm=val('dn').trim();if(!nm||dests().includes(nm))return;const o=SC;SC={...SC,dests:dests().concat(nm)};if(await writeCfg())rr();else SC=o}
@@ -278,7 +278,7 @@ function cardBody(st,id,it){return `<div class="tw"><table><tr><th>التاري�
 function ledgerPick(st,L,ids){if(!ids.length)return '';const cur=L[SEL[st]]?SEL[st]:'';
 return `<div class="card"><h3>كارت الصنف (حركة صنف واحد)</h3><label>اختار الصنف<select onchange="SEL['${st}']=this.value;rr()"><option value="">— اختار صنف —</option>${ids.map(i=>`<option value="${i}" ${i==cur?'selected':''}>${esc(L[i].n)} · ${fx(L[i].bal)}</option>`).join('')}</select></label>${cur?cardBody(st,cur,L[cur]):'<p class="mu">اختار صنف عشان تشوف حركته.</p>'}</div>`}
 const obH=(st,L,ids)=>ids.length?`<details class="card" id="k_ob_${st}"><summary>📥 إدخال الأرصدة الافتتاحية (كل الأصناف مرة واحدة)</summary><label style="margin-top:8px">تاريخ الرصيد<input type="date" id="ob_d_${st}" value="${SC.start||today()}"></label><div class="g2">${ids.map(i=>`<label>${esc(L[i].n)}<input type="number" step="any" data-ob="${st}|${i}"></label>`).join('')}</div><p class="mu">سيب الصنف فاضي لو رصيده صفر. الأفضل يكون التاريخ نفس تاريخ بدء المخازن.</p><button class="save" onclick="saveOB('${st}')">حفظ الأرصدة الافتتاحية</button></details>`:'';
-async function saveOB(st){const L=ledger(st),d=val('ob_d_'+st)||today(),t=Date.now(),b=FS.batch();let k=0;
+  async function saveOB(st){const L=ledger(st),d=val('ob_d_'+st)||today(),t=Date.now(),b=FS.batch();let k=0;
 document.querySelectorAll('input[data-ob]').forEach(e=>{const[sx,i]=e.dataset.ob.split('|');if(sx!=st)return;const q=+e.value;if(q>0){k++;b.set(FS.doc('moves/m'+t+'_'+k),cl({id:'m'+t+'_'+k,ts:t+k,st,item:i,n:(L[i]||{}).n||'',dir:'in',qty:q,kind:'open',date:d,note:'رصيد افتتاحي',dest:''}))}});
 if(!k){smsg('اكتب رصيد لصنف واحد على الأقل.');return}
 try{await b.commit();rr()}catch(e){smsg('تعذر الحفظ. تأكد من صلاحية إدارة المخازن ومن قواعد Firestore.')}}
@@ -335,7 +335,7 @@ return `<div class="card"><h3>ملخص التشغيلات</h3><div class="grid">
 <div class="card"><h3>قائمة التشغيلات</h3>${R.length?`<div class="tw"><table><tr><th>#<th>التاريخ<th>الخام<th>الناتج<th>الفقد<th>الربح${R.map((r,i)=>`<tr><td>${r.no||''}<td>${esc(r.date||'')}<td>${fx(r.raw)}<td>${fx(C[i].out)}<td>${n(C[i].lossP)}%<td>${m(C[i].profit)}`).join('')}</table></div>`:'<p class="mu">مفيش تشغيلات في الفترة دي.</p>'}</div>`}
 const expCard=()=>`<div class="card"><h3>⬇ تصدير إكسيل · ${rgLabel()}</h3><div class="acts2"><button class="add" onclick="xp('raw')">🌾 ${esc(tn('raws'))}</button><button class="add" onclick="xp('fg')">📦 ${esc(tn('fg'))}</button><button class="add" onclick="xp('iss')">🏭 ${esc(tn('rp_issues'))}</button><button class="add" onclick="xp('sup')">🚚 ${esc(tn('rp_sup'))}</button>${SP?`<button class="add" onclick="xp('runs')">🧾 ${esc(tn('rp_runs'))}</button>`:''}<button class="add" onclick="xp('all')">📚 الكل في ملف واحد</button></div><p id="xm" class="mu"></p></div>`;
 function repH(){const b=(k,i)=>`<button class="${RV==k?'on':''}" onclick="RV='${k}';rr()">${i} ${esc(tn('rp_'+k))}</button>`;
-return rgBar()+`<div class="seg">${b('issues','🏭')}${b('sup','🚚')}${b('runs','🧾')}</div>`+(RV=='issues'?issH():RV=='sup'?supH():rnH())+expCard()}
+return rgBar()+`<div class="seg">${b('issues','🏭')}${b('sup','🚚')}${b('runs','🧾')}</div>`+(RV=='issues'?issH():RV=='sup'?supH():rnH())+expCard()+archCard()}
 /* تصدير إكسيل */
 function stockRange(st){const L=ledger(st),A=[['الصنف','رصيد أول المدة','وارد','منصرف','رصيد آخر المدة']],B=[['الصنف','التاريخ','البيان','وارد','منصرف','الرصيد']];
 Object.values(L).forEach(it=>{let ob=0;it.rows.forEach(r=>{if(RG.f&&(r.d||'')<RG.f)ob+=(r.in||0)-(r.out||0)});let b=ob,i=0,o=0;
@@ -356,19 +356,43 @@ b.push([r.no||'',r.date,'قشر (إيراد)',r.shell,r.raw?r.shell/r.raw*100:0,
 function xl(sheets,fn){const W=XLSX.utils,wb=W.book_new();wb.Workbook={Views:[{RTL:true}]};
 sheets.forEach(([nm,rows])=>{const w=W.aoa_to_sheet(rows);w['!cols']=(rows[0]||[]).map(()=>({wch:18}));W.book_append_sheet(wb,w,nm.slice(0,31))});
 DL.save({filename:fn+'-'+today()+'.xlsx',data:XLSX.write(wb,{bookType:'xlsx',type:'array'})})}
-async function xp(k){const xm=$('#xm');if(xm)xm.textContent='';
+async function xp(k,fn){const xm=$('#xm');if(xm)xm.textContent='';
 try{if(!window.XLSX){if(xm)xm.textContent='مكتبة الإكسيل لسه بتتحمل، جرب بعد ثانية.';return}
 const sh=[],all=k=='all',add=(p,r)=>{sh.push([p+' - ملخص',r[0]],[p+' - تفصيل',r[1]])};
 if(k=='raw'||all)add('خام',stockRange('raw'));if(k=='fg'||all)add('منتج تام',stockRange('fg'));
 if(k=='iss'||all)add('صرفيات',issSheets());if(k=='sup'||all)add('موردين',supSheets());
 if((k=='runs'||all)&&SP)add('تشغيلات',runSheets());
-xl(sh,'peanut-'+k);if(xm)xm.textContent='تم تجهيز الملف (الفترة: '+rgLabel()+').'}
-catch(e){if(xm)xm.textContent='معرفناش نجهز الملف، جرب تاني.'}}
+xl(sh,fn||'peanut-'+k);if(xm)xm.textContent='تم تجهيز الملف (الفترة: '+rgLabel()+').';return true}
+catch(e){if(xm)xm.textContent='معرفناش نجهز الملف، جرب تاني.';return false}}
 const exportX=()=>xp('runs');
 /* أسماء التبويبات */
 const namesH=()=>ME.owner?`<div class="card"><h3>✏️ أسماء التبويبات والتقارير</h3><p class="mu">اكتب الاسم الجديد وهيتغير عند كل المستخدمين. سيب الخانة فاضية للاسم الأصلي.</p>${Object.keys(TD).map(k=>`<label>${esc(TD[k])}<input data-tn="${k}" value="${esc(TN[k]||'')}" placeholder="${esc(TD[k])}"></label>`).join('')}<button class="add" onclick="resetTN()">رجّع الأسماء الأصلية</button></div>`:'';
 const saveTN=()=>later('ui',()=>FS.doc('settings/ui').set(cl({tabs:TN})));
 function resetTN(){TN={};saveTN();updNav();rr()}
 document.addEventListener('input',e=>{const k=e.target.dataset.tn;if(!k||!ME.owner)return;const v=e.target.value.trim();if(v)TN[k]=v;else delete TN[k];saveTN();updNav()});
+
+/* ===== v4: أرشيف الشهر ===== */
+let AM=(function(){const d=new Date();return lt(new Date(d.getFullYear(),d.getMonth()-1,1)).slice(0,7)})(),AD='';
+function mRange(ym){const[y,m]=ym.split('-').map(Number);return{f:lt(new Date(y,m-1,1)),t:lt(new Date(y,m,0)),nx:lt(new Date(y,m,1))}}
+const inM=d=>(d||'').slice(0,7)==AM;
+function archCard(){if(!ME.owner)return '';const rn=S.runs.filter(x=>inM(x.date)).length,mv=Object.values(MV).filter(v=>inM(v.date)).length,past=AM<today().slice(0,7);
+return `<div class="card"><h3>🗄️ أرشيف الشهر</h3><p class="mu">الخطوة 1: نزّل الشهر كملف إكسيل بنفس تنسيق التقارير (تشغيلات + مخازن بأرصدة أول وآخر الشهر + صرفيات + موردين). الخطوة 2 (اختيارية): احذف الشهر من السحابة لتخفيف البيانات، والأرصدة بتتنقل لوحدها كرصيد افتتاحي في أول الشهر اللي بعده.</p><label>الشهر<input type="month" value="${AM}" onchange="AM=this.value||AM;AD='';rr()"></label><p class="mu">في الشهر ده: ${rn} تشغيلة · ${mv} حركة مخزن</p><button class="save" onclick="archX()">⬇ تنزيل أرشيف ${AM} (إكسيل)</button>${past?`<button class="add" ${AD==AM?'':'disabled'} onclick="archDel(this)">🗑 حذف شهر ${AM} من السحابة${AD==AM?'':' (نزّل الأرشيف الأول)'}</button>`:'<p class="mu">الشهر الحالي ما ينفعش يتحذف.</p>'}<p id="am" class="mu"></p></div>`}
+async function archX(){const o=RG,r=mRange(AM);RG={f:r.f,t:r.t};let ok=false;try{ok=await xp('all','peanut-archive-'+AM)}finally{RG=o}
+if(ok)AD=AM;rr();const a=$('#am');if(a)a.textContent=ok?'تم تنزيل الملف. اتأكد إنه اتحفظ على جهازك قبل ما تحذف الشهر من السحابة.':'معرفناش ننزّل الملف.'}
+async function archDel(b){if(!ME.owner||AD!=AM||AM>=today().slice(0,7))return;
+if(!b.dataset.s){b.dataset.s=1;b.textContent='اضغط تاني للتأكيد — الحذف نهائي';return}
+const am=$('#am'),r=mRange(AM);b.disabled=true;am.textContent='جاري الأرشفة… لا تقفل الصفحة.';
+try{const ar=FS.doc('archives/'+AM),sn=await ar.get();let st0;
+if(sn.exists&&sn.data().status=='pending')st0=sn.data();
+else{const carry=[];['raw','fg'].forEach(st=>{const L=ledger(st);Object.keys(L).forEach(id=>{const bal=L[id].rows.filter(x=>(x.d||'')<=r.t).reduce((a,x)=>a+(x.in||0)-(x.out||0),0);if(Math.abs(bal)>1e-9)carry.push({st,item:id,n:L[id].n,bal:Math.round(bal*1e6)/1e6})})});
+st0={status:'pending',carry,noBase:Math.max(SC.noBase||0,S.runs.reduce((a,x)=>Math.max(a,x.no||0),0)),at:Date.now()};await ar.set(cl(st0))}
+await FS.doc('stockcfg/main').set({noBase:st0.noBase},{merge:true});
+const cm=st0.carry.map(c=>({id:'ca_'+AM+'_'+c.st+'_'+c.item,ts:Date.now(),st:c.st,item:c.item,n:c.n,dir:c.bal>0?'in':'out',qty:Math.abs(c.bal),kind:c.bal>0?'open':'adj',date:r.nx,note:'رصيد مُرحّل من أرشيف '+AM,dest:'',sup:''}));
+for(let i=0;i<cm.length;i+=400){const bt=FS.batch();cm.slice(i,i+400).forEach(v=>bt.set(FS.doc('moves/'+v.id),cl(v)));await bt.commit()}
+const del=[];S.runs.filter(x=>inM(x.date)).forEach(x=>{del.push('runs/'+x.id,'money/'+x.id)});Object.values(MV).filter(v=>inM(v.date)).forEach(v=>del.push('moves/'+v.id));
+for(let i=0;i<del.length;i+=400){const bt=FS.batch();del.slice(i,i+400).forEach(p=>bt.delete(FS.doc(p)));await bt.commit()}
+await ar.set(cl({...st0,status:'done',at:Date.now()}));
+AD='';am.textContent='تمت الأرشفة: اتحذف '+del.length+' سجل، واتنقل '+cm.length+' رصيد لأول الشهر اللي بعده.';rr()}
+catch(e){b.disabled=false;am.textContent='حصل خطأ أثناء الأرشفة. اضغط حذف تاني عشان تكمّل من حيث وقفت. (لازم قواعد Firestore تتحدث)'}}
 $('#v').innerHTML='<p class=mu>جاري التحميل…</p>';
 </script></body></html>
