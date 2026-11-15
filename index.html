@@ -54,19 +54,21 @@ let S={alloc:'w',runs:[],prices:[
 let unU=null,MV={},SC={},EM='',CAN_ST=false,unMv=null,unSc=null,mig=0,DB=null,CAN_RUN=false,CAN_EDIT=false,CAN_ADD=false,ACC=false,SP=false,PERM=null,ME={},DID='',VW={},PM={},shown=0,got=0,pr=0,seeded=0,RM={},MN={},ITEMS=null,PR={},unM=null,unP=null,unR=null,unS=null;const timers={};
 try{const a=JSON.parse(localStorage.getItem('mq1a'));if(a&&a.alloc)S.alloc=a.alloc}catch(e){}
 const save=()=>{try{localStorage.setItem('mq1a',JSON.stringify({alloc:S.alloc}))}catch(e){}};
-const newD=()=>({date:lt(new Date()),note:'',rawId:'',rawP:0,raw:0,moist:10,soaked:0,outs:{},shell:0});
+const newD=()=>({date:lt(new Date()),note:'',rawId:'',rawP:0,raw:0,moist:10,soaked:0,outs:{},byk:{},shell:0});
 let D=newD();
 const P=t=>S.prices.filter(x=>x.t==t);
+const prodsFor=id=>{const ids=new Set(P('raw').map(x=>x.id));return P('prod').filter(x=>!x.r||!ids.has(x.r)||x.r==id)};
 function mk(d){const r=P('raw').find(x=>x.id==d.rawId),sh=P('shell')[0];
-return{...d,rawN:r?r.name:'',prods:P('prod').map(x=>({id:x.id,n:x.name,p:x.p,kg:d.outs[x.id]||0})),shellP:sh?sh.p:0,costs:P('cost').map(x=>({n:x.name,b:x.b,p:x.p}))}}
+return{...d,rawN:r?r.name:'',prods:prodsFor(d.rawId).map(x=>({id:x.id,n:x.name,p:x.p,kg:d.outs[x.id]||0})),by:P('by').map(x=>({id:x.id,n:x.name,p:x.p,kg:(d.byk||{})[x.id]||0})),shellP:sh?sh.p:0,costs:P('cost').map(x=>({n:x.name,b:x.b,p:x.p}))}}
 function calc(r){
 const soak=r.soaked>0?r.soaked:r.raw*(1+r.moist/100),moist=r.raw>0?(soak/r.raw-1)*100:0,
-kern=r.prods.reduce((a,x)=>a+x.kg,0),out=kern+r.shell,loss=soak-out,
+bs=r.by||[],byKg=bs.reduce((a,x)=>a+x.kg,0),byRev=bs.reduce((a,x)=>a+x.kg*x.p,0),
+kern=r.prods.reduce((a,x)=>a+x.kg,0),out=kern+r.shell+byKg,loss=soak-out,
 rawCost=r.raw*r.rawP,proc=r.costs.reduce((a,c)=>a+c.p*(c.b=='kg'?r.raw:1),0),cost=rawCost+proc,
-shellRev=r.shell*r.shellP,net=cost-shellRev,val=r.prods.reduce((a,x)=>a+x.kg*x.p,0),
+shellRev=r.shell*r.shellP,net=cost-shellRev-byRev,val=r.prods.reduce((a,x)=>a+x.kg*x.p,0),
 ps=r.prods.map(x=>{const w=S.alloc=='v'?(val?x.kg*x.p/val:0):(kern?x.kg/kern:0),c=net*w;return{...x,c,cpk:x.kg?c/x.kg:0}}),
-rev=val+shellRev;
-return{raw:r.raw,shell:r.shell,soak,moist,kern,out,loss,lossP:soak?loss/soak*100:0,lossC:soak?loss*cost/soak:0,rawCost,proc,cost,net,avg:kern?net/kern:0,rev,profit:rev-cost,ps,shellRev}}
+rev=val+shellRev+byRev;
+return{bs,byKg,byRev,raw:r.raw,shell:r.shell,soak,moist,kern,out,loss,lossP:soak?loss/soak*100:0,lossC:soak?loss*cost/soak:0,rawCost,proc,cost,net,avg:kern?net/kern:0,rev,profit:rev-cost,ps,shellRev}}
 function resHTML(c){
 const rows=c.ps.map(x=>`<tr><td>${esc(x.n)}<td>${n(x.kg)} (${n(c.raw?x.kg/c.raw*100:0)}%)<td>${m(x.c)}<td>${m(x.cpk)}<td class="${x.p-x.cpk<0?'bad':'ok'}">${m(x.p-x.cpk)}`).join('');
 return `<div class="grid">
@@ -79,8 +81,8 @@ return `<div class="grid">
 <div><b>${m(c.rev)}</b>إجمالي البيع المتوقع</div>
 <div class="${c.profit<0?'bad':'ok'}"><b>${m(c.profit)}</b>صافي الربح</div></div>
 ${c.loss<0?'<p class="bad">الناتج أكبر من وزن الفول بعد النقع. زوّد نسبة الرطوبة أو اكتب الوزن الفعلي بعد النقع.</p>':''}
-<div class="tw"><table><tr><th>الصنف<th>كجم (% من الخام)<th>إجمالي التكلفة<th>تكلفة الكجم<th>ربح الكجم${rows}<tr><td><b>الإجمالي</b><td>${n(c.kern)}<td>${m(c.net)}<td>${m(c.avg)}<td><tr><td>قشر (إيراد)<td>${n(c.shell)} (${n(c.raw?c.shell/c.raw*100:0)}%)<td>—<td>—<td>${m(c.shellRev)}</table></div>
-<p class="mu">الخام ${m(c.rawCost)} + تشغيل ${m(c.proc)} − إيراد القشر ${m(c.shellRev)} = ${m(c.net)} بتتوزع على الأصناف.</p>
+<div class="tw"><table><tr><th>الصنف<th>كجم (% من الخام)<th>إجمالي التكلفة<th>تكلفة الكجم<th>ربح الكجم${rows}<tr><td><b>الإجمالي</b><td>${n(c.kern)}<td>${m(c.net)}<td>${m(c.avg)}<td><tr><td>قشر (إيراد)<td>${n(c.shell)} (${n(c.raw?c.shell/c.raw*100:0)}%)<td>—<td>—<td>${m(c.shellRev)}${(c.bs||[]).filter(x=>x.kg>0).map(x=>`<tr><td>${esc(x.n)} (إيراد)<td>${n(x.kg)} (${n(c.raw?x.kg/c.raw*100:0)}%)<td>—<td>—<td>${m(x.kg*x.p)}`).join('')}</table></div>
+<p class="mu">الخام ${m(c.rawCost)} + تشغيل ${m(c.proc)} − إيراد القشر ${m(c.shellRev)}${c.byRev?' − إيراد منتجات جانبية '+m(c.byRev):''} = ${m(c.net)} بتتوزع على الأصناف.</p>
 <label>توزيع التكلفة على الأصناف<select onchange="setAlloc(this.value)"><option value="w" ${S.alloc=='w'?'selected':''}>بالوزن (نفس تكلفة الكجم)</option><option value="v" ${S.alloc=='v'?'selected':''}>بالقيمة (حسب سعر البيع)</option></select></label>`}
 function setAlloc(v){S.alloc=v;save();show()}
 function formH(){
@@ -89,24 +91,30 @@ return `<div class="card"><div class="g2"><label>التاريخ<input type="date
 <div class="g2"><label>نوع الخام<select onchange="pickRaw(this.value)">${R.map(x=>`<option value="${x.id}" ${x.id==D.rawId?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label><label style="${SP?'':'display:none'}">سعر كجم الخام<input id="rp" type="number" step="any" data-k="rawP" value="${D.rawP}"></label></div>
 <p id="rbal" class="mu"></p><div class="g2"><label>كمية الخام (كجم)<input type="number" step="any" data-k="raw" value="${D.raw||''}"></label><label>رطوبة النقع التقديرية %<input type="number" step="any" data-k="moist" value="${D.moist}"></label></div>
 <label>وزن الفول بعد النقع الفعلي (اختياري، لو كتبته بيلغي التقدير)<input type="number" step="any" data-k="soaked" value="${D.soaked||''}"></label></div>
-<div class="card"><h3>المخرجات (كجم)</h3><div class="g2">${P('prod').map(x=>`<label>${esc(x.name)}<input type="number" step="any" data-k="o_${x.id}" value="${D.outs[x.id]||''}"></label>`).join('')}<label>القشر<input type="number" step="any" data-k="shell" value="${D.shell||''}"></label></div></div>
+<div class="card"><h3>المخرجات (كجم)</h3><div class="g2">${prodsFor(D.rawId).map(x=>`<label>${esc(x.name)}<input type="number" step="any" data-k="o_${x.id}" value="${D.outs[x.id]||''}"></label>`).join('')}<label>القشر<input type="number" step="any" data-k="shell" value="${D.shell||''}"></label>${P('by').map(x=>`<label>${esc(x.name)}<input type="number" step="any" data-k="b_${x.id}" value="${(D.byk||{})[x.id]||''}"></label>`).join('')}</div>${prodsFor(D.rawId).length?'':'<p class="mu">مفيش أصناف لنوع الخام ده. أضفها من الأسعار.</p>'}</div>
 <div class="card" id="res"></div><p id="msg" class="bad"></p><button class="save" onclick="saveRun()">حفظ التشغيلة</button>`}
 function upd(){$('#res').innerHTML=resHTML(calc(mk(D)));rbal()}
-function pickRaw(id){D.rawId=id;D.rawP=S.prices.find(x=>x.id==id).p;$('#rp').value=D.rawP;upd()}
+function pickRaw(id){D.rawId=id;D.rawP=S.prices.find(x=>x.id==id).p;D.outs={};show()}
 async function saveRun(){if(!(D.raw>0)){$('#msg').textContent='اكتب كمية الخام الأول.';return}
 const r={...mk(D),id:Date.now(),no:nextNo()};
 try{const{main,mon}=split(r),b=FS.batch();b.set(FS.doc('runs/'+r.id),main);if(SP)b.set(FS.doc('money/'+r.id),mon);await b.commit()}catch(e){$('#msg').textContent='تعذر الحفظ في السحابة. تأكد من صلاحية الكتابة وجرب مرة أخرى.';return}
 const{date,moist,rawId,rawP}=D;D=newD();Object.assign(D,{date,moist,rawId,rawP});tab='runs';show()}
+const RAWSEL=()=>P('raw');
 function runsH(){const L=S.runs;if(!L.length)return '<div class="card">لسه مفيش تشغيلات متسجلة.</div>';
 const C=L.map(calc),T=k=>C.reduce((a,c)=>a+c[k],0);
 return `<div class="card" id="tot"><h3>إجمالي ${L.length} تشغيلة</h3><div class="grid"><div><b>${n(L.reduce((a,r)=>a+r.raw,0))} كجم</b>خام</div><div><b>${n(T('loss')/T('soak')*100)}%</b>متوسط الفقد</div><div><b>${m(T('cost'))}</b>إجمالي التكلفة</div><div class="${T('profit')<0?'bad':'ok'}"><b>${m(T('profit'))}</b>إجمالي الربح</div></div><button class="save" id="xb" onclick="exportX()" style="display:${DL&&SP?'block':'none'}">⬇ تصدير التشغيلات إكسيل (${rgLabel()})</button><p id="xm" class="mu"></p></div>`+
 L.map((r,i)=>`<details class="card" id="d${r.id}"><summary id="s${r.id}">${sumT(r,C[i])}</summary><br><div id="r${r.id}">${resHTML(C[i])}</div>${SP&&CAN_EDIT?editH(r):''}<button class="add" onclick="delRun(${r.id},this)">حذف التشغيلة</button></details>`).join('')}
 async function delRun(id,b){if(!b.dataset.s){b.dataset.s=1;b.textContent='اضغط تاني للتأكيد';return}
-try{const bt=FS.batch();bt.delete(FS.doc('runs/'+id));if(SP)bt.delete(FS.doc('money/'+id));await bt.commit()}catch(e){b.textContent='تعذر الحذف'}}
+try{const bt=FS.batch();bt.delete(FS.doc('runs/'+id));if(SP)bt.delete(FS.doc('money/'+id));await bt.commit()}catch(e){b.textContent='تعذر الحذف'}} 
 function priceH(){
+const RW=P('raw'),rid=new Set(RW.map(x=>x.id)),
+prow=x=>`<div class="row"><input value="${esc(x.name)}" data-p="${x.id}:name"><input class="num" type="number" step="any" value="${x.p}" data-p="${x.id}:p"><select data-p="${x.id}:r"><option value="">كل الأنواع</option>${RW.map(r=>`<option value="${r.id}" ${x.r==r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select><button onclick="delP('${x.id}')">✕</button></div>`,
+pg=(title,list,rawId)=>`<div class="card"><h3>${title}</h3>${list.map(prow).join('')||'<p class="mu">لسه مفيش أصناف.</p>'}<button class="add" onclick="addP('prod','${rawId}')">+ إضافة صنف</button></div>`,
+byS=`<div class="card"><h3>منتجات جانبية أخرى (سعر بيع الكجم)</h3><p class="mu">أي ناتج غير الأصناف والقشر (مخلفات، تقاوي، نواتج تانية). بتظهر في خانات التشغيلة وإيرادها بيتخصم من تكلفة الأصناف.</p>${P('by').map(x=>`<div class="row"><input value="${esc(x.name)}" data-p="${x.id}:name"><input class="num" type="number" step="any" value="${x.p}" data-p="${x.id}:p"><button onclick="delP('${x.id}')">✕</button></div>`).join('')}<button class="add" onclick="addP('by')">+ إضافة منتج جانبي</button></div>`,
+sec2=()=>RW.map(r=>pg('🥜 أصناف '+esc(r.name)+' (سعر بيع الكجم)',P('prod').filter(x=>x.r==r.id),r.id)).join('')+(P('prod').some(x=>!x.r||!rid.has(x.r))?pg('أصناف لكل الأنواع (غير مربوطة بخام)',P('prod').filter(x=>!x.r||!rid.has(x.r)),''):'');
 const sec=(t,title)=>`<div class="card"><h3>${title}</h3>${P(t).map(x=>`<div class="row"><input value="${esc(x.name)}" data-p="${x.id}:name"><input class="num" type="number" step="any" value="${x.p}" data-p="${x.id}:p">${t=='cost'?`<select data-p="${x.id}:b"><option value="kg" ${x.b=='kg'?'selected':''}>لكل كجم خام</option><option value="run" ${x.b=='run'?'selected':''}>لكل تشغيلة</option></select>`:''}${t=='shell'?'':`<button onclick="delP('${x.id}')">✕</button>`}</div>`).join('')}${t=='shell'?'':`<button class="add" onclick="addP('${t}')">+ إضافة</button>`}</div>`;
-return `<p class="mu">الأسعار دي أرقام مبدئية، عدّلها على أسعارك. التشغيلات المتسجلة بتحتفظ بأسعارها وقت التسجيل.</p>`+sec('raw','أنواع الخام (سعر شراء الكجم)')+sec('prod','الأصناف الناتجة (سعر بيع الكجم)')+sec('shell','القشر (سعر بيع الكجم)')+sec('cost','تكاليف التشغيل')}
-function addP(t){S.prices.push({id:'x'+Date.now(),name:t=='raw'?'خام جديد':t=='prod'?'صنف جديد':'تكلفة جديدة',t,p:0,b:'kg'});save();pushPrices();show()}
+return `<p class="mu">الأسعار دي أرقام مبدئية، عدّلها على أسعارك. التشغيلات المتسجلة بتحتفظ بأسعارها وقت التسجيل.</p>`+sec('raw','أنواع الخام (سعر شراء الكجم)')+sec2()+(RW.length?'':pg('الأصناف الناتجة (سعر بيع الكجم)',P('prod'),''))+sec('shell','القشر (سعر بيع الكجم، تقدر تغيّر اسمه وسعره)')+byS+sec('cost','تكاليف التشغيل')}
+function addP(t,r){const o={id:'x'+Date.now(),name:t=='raw'?'خام جديد':t=='prod'?'صنف جديد':t=='by'?'منتج جانبي جديد':'تكلفة جديدة',t,p:0,b:'kg'};if(t=='prod'&&r)o.r=r;S.prices.push(o);save();pushPrices();show()}
 function delP(id){S.prices=S.prices.filter(x=>x.id!=id);save();pushPrices();show()}
   function show(){const lock=DB&&!ACC;document.querySelector('nav').style.display=lock?'none':'';
 if(lock){$('#v').innerHTML=lockH();return}
@@ -120,13 +128,13 @@ if(tab=='new'&&!CAN_ADD)off('#v .save');
 if(tab=='runs'&&!CAN_RUN)off('#v [data-r],#v .add');
 if(tab=='prices'&&!CAN_EDIT){off('#v input,#v select,#v button');$('#v').insertAdjacentHTML('afterbegin','<p class=mu>تعديل الأسعار للمحرّر أو المالك فقط.</p>')}}
 const onIn=e=>{const t=e.target,k=t.dataset.k,p=t.dataset.p;
-if(k){const v=t.value;if(k.startsWith('o_'))D.outs[k.slice(2)]=+v||0;else D[k]=t.type=='number'?(+v||0):v;upd()}
-else if(p){const[id,f]=p.split(':'),x=S.prices.find(y=>y.id==id);if(x){x[f]=f=='p'?(+t.value||0):t.value;save();pushPrices()}}};
+if(k){const v=t.value;if(k.startsWith('o_'))D.outs[k.slice(2)]=+v||0;else if(k.startsWith('b_')){D.byk=D.byk||{};D.byk[k.slice(2)]=+v||0}else D[k]=t.type=='number'?(+v||0):v;upd()}
+else if(p){const[id,f]=p.split(':'),x=S.prices.find(y=>y.id==id);if(x){x[f]=f=='p'?(+t.value||0):t.value;save();pushPrices();if(f=='r')show()}}};
 const sumT=(r,c)=>`${r.no?'#'+r.no+' · ':''}${r.date} · ${esc(r.rawN||'')} ${esc(r.note)} · ${n(r.raw)} كجم · ربح ${m(c.profit)}`,
-editH=r=>`<details style="margin-top:8px"><summary class="mu">تعديل أسعار التشغيلة دي</summary><div class="g2" style="margin-top:8px"><label>سعر كجم الخام<input type="number" step="any" data-r="${r.id}:rawP" value="${r.rawP}"></label>${r.prods.map((x,i)=>`<label>${esc(x.n)}<input type="number" step="any" data-r="${r.id}:p:${i}" value="${x.p}"></label>`).join('')}<label>القشر<input type="number" step="any" data-r="${r.id}:shellP" value="${r.shellP}"></label>${r.costs.map((x,i)=>`<label>${esc(x.n)} (${x.b=='kg'?'لكل كجم خام':'لكل تشغيلة'})<input type="number" step="any" data-r="${r.id}:c:${i}" value="${x.p}"></label>`).join('')}</div></details>`;
+editH=r=>`<details style="margin-top:8px"><summary class="mu">تعديل أسعار التشغيلة دي</summary><div class="g2" style="margin-top:8px"><label>سعر كجم الخام<input type="number" step="any" data-r="${r.id}:rawP" value="${r.rawP}"></label>${r.prods.map((x,i)=>`<label>${esc(x.n)}<input type="number" step="any" data-r="${r.id}:p:${i}" value="${x.p}"></label>`).join('')}<label>القشر<input type="number" step="any" data-r="${r.id}:shellP" value="${r.shellP}"></label>${(r.by||[]).map((x,i)=>`<label>${esc(x.n)}<input type="number" step="any" data-r="${r.id}:b:${i}" value="${x.p}"></label>`).join('')}${r.costs.map((x,i)=>`<label>${esc(x.n)} (${x.b=='kg'?'لكل كجم خام':'لكل تشغيلة'})<input type="number" step="any" data-r="${r.id}:c:${i}" value="${x.p}"></label>`).join('')}</div></details>`;
 document.addEventListener('input',e=>{const q=e.target.dataset.r;if(!q)return;
 const[id,f,i]=q.split(':'),r=S.runs.find(x=>x.id==id),v=+e.target.value||0;if(!r)return;
-if(f=='rawP')r.rawP=v;else if(f=='shellP')r.shellP=v;else if(f=='p')r.prods[i].p=v;else if(f=='c')r.costs[i].p=v;
+if(f=='rawP')r.rawP=v;else if(f=='shellP')r.shellP=v;else if(f=='p')r.prods[i].p=v;else if(f=='b')r.by[i].p=v;else if(f=='c')r.costs[i].p=v;
 save();pushRun(r);const c=calc(r);$('#r'+id).innerHTML=resHTML(c);$('#s'+id).innerHTML=sumT(r,c);
 const tmp=document.createElement('div');tmp.innerHTML=runsH();$('#tot').innerHTML=tmp.firstElementChild.innerHTML});
 document.addEventListener('input',onIn);document.addEventListener('change',onIn);
@@ -142,12 +150,13 @@ op.forEach(i=>{const d=document.getElementById(i);if(d)d.open=true})}
 const OWNER='mohamedadelz933@gmail.com',CFG={apiKey:"AIzaSyDZx5Sr8jIeCGq3DMyg8bhL0U7xd_PfJwQ",authDomain:"peanut-sheller.firebaseapp.com",projectId:"peanut-sheller",storageBucket:"peanut-sheller.firebasestorage.app",messagingSenderId:"889824132028",appId:"1:889824132028:web:99f88c7ef0587891c0c9b9"};
 firebase.initializeApp(CFG);const FS=firebase.firestore(),AU=firebase.auth();
 const cl=o=>JSON.parse(JSON.stringify(o));
-const split=r=>({main:cl({id:r.id,no:r.no,date:r.date,note:r.note,rawId:r.rawId,rawN:r.rawN,raw:r.raw,moist:r.moist,soaked:r.soaked,shell:r.shell,outs:r.outs,po:r.prods.map(x=>x.id),pn:Object.fromEntries(r.prods.map(x=>[x.id,x.n]))}),mon:cl({rawP:r.rawP,shellP:r.shellP,prods:Object.fromEntries(r.prods.map(x=>[x.id,x.p])),costs:r.costs})});
+const split=r=>({main:cl({id:r.id,no:r.no,date:r.date,note:r.note,rawId:r.rawId,rawN:r.rawN,raw:r.raw,moist:r.moist,soaked:r.soaked,shell:r.shell,outs:r.outs,po:r.prods.map(x=>x.id),pn:Object.fromEntries(r.prods.map(x=>[x.id,x.n])),bo:(r.by||[]).map(x=>x.id),bn:Object.fromEntries((r.by||[]).map(x=>[x.id,x.n])),by:Object.fromEntries((r.by||[]).map(x=>[x.id,x.kg]))}),mon:cl({rawP:r.rawP,shellP:r.shellP,byp:Object.fromEntries((r.by||[]).map(x=>[x.id,x.p])),prods:Object.fromEntries(r.prods.map(x=>[x.id,x.p])),costs:r.costs})});
 function mergePrices(){if(ITEMS)S.prices=ITEMS.map(x=>({...x,p:PR[x.id]||0}))}
 function rebuild(){const cur=id=>(S.prices.find(x=>x.id==id)||{}).p||0,sh=P('shell')[0],old=S.runs;
                    S.runs=Object.values(RM).map(m=>{if(timers['r'+m.id]){const x=old.find(y=>y.id==m.id);if(x)return x}
 const mo=MN[m.id];return{...m,rawP:mo?mo.rawP:cur(m.rawId),shellP:mo?mo.shellP:(sh?sh.p:0),
 prods:(m.po||[]).map(id=>({id,n:(m.pn||{})[id]||id,p:mo&&mo.prods?mo.prods[id]||0:cur(id),kg:(m.outs||{})[id]||0})),
+by:(m.bo||[]).map(id=>({id,n:(m.bn||{})[id]||id,p:mo&&mo.byp?mo.byp[id]||0:cur(id),kg:(m.by||{})[id]||0})),
 costs:mo&&mo.costs?mo.costs:P('cost').map(x=>({n:x.name,b:x.b,p:x.p}))}}).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.id-a.id)}
 function watch(){
 if(SP&&!unM){unM=FS.collection('money').onSnapshot(sn=>{MN={};sn.docs.forEach(d=>MN[d.id]=d.data());rebuild();if(shown)refresh()},()=>{});
@@ -193,7 +202,7 @@ return `<div class="card"><b>${esc(VW[i].name||'زائر')}</b> <span class=mu>$
 document.addEventListener('change',e=>{const q=e.target.dataset.a;if(!q||!ME.owner)return;const[i,k,d]=q.split('|'),p={...(PM[i]||{})};
 if(k=='bd'){const s=new Set(p.bd||[]);e.target.checked?s.add(d):s.delete(d);p.bd=[...s]}else p[k]=e.target.checked;
 PM[i]=p;later('p'+i,()=>DB.doc('perms/'+i).set(JSON.parse(JSON.stringify(p))))});
-/* ===== المخازن: خام + منتج تام ===== */
+  /* ===== المخازن: خام + منتج تام ===== */
 const DEF_DEST=['المصنع الجديد','التبطين','بيع','مخلفات','هالك'],
 dests=()=>(SC.dests&&SC.dests.length)?SC.dests:DEF_DEST,
 val=i=>{const e=document.getElementById(i);return e?e.value:''},num=i=>+val(i)||0,
@@ -208,11 +217,12 @@ if(v.kind=='adj')return 'تسوية جرد '+(v.dir=='in'?'(زيادة)':'(عج�
 return (KL[v.kind]||'حركة')+(v.sup?' · '+v.sup:'')+nt}
 function ledger(st){const L={},start=SC.start||'';
 const ensure=(id,nm)=>(L[id]=L[id]||{n:nm||id,rows:[]});
-(st=='raw'?P('raw'):P('prod').concat(P('shell'))).forEach(x=>ensure(x.id,x.name));
+(st=='raw'?P('raw'):P('prod').concat(P('shell'),P('by'))).forEach(x=>ensure(x.id,x.name));
 S.runs.forEach(r=>{if((r.date||'')<start)return;const no=r.no||'؟';
 if(st=='raw'){if(r.raw>0&&r.rawId)ensure(r.rawId,r.rawN).rows.push({d:r.date,ts:r.id,out:r.raw,t:'سحب لتشغيلة رقم '+no+(r.note?' · '+r.note:'')})}
 else{r.prods.forEach(x=>{if(x.kg>0)ensure(x.id,x.n).rows.push({d:r.date,ts:r.id,in:x.kg,t:'ناتج تشغيلة رقم '+no})});
-if(r.shell>0)ensure(shId(),'قشر').rows.push({d:r.date,ts:r.id,in:r.shell,t:'ناتج تشغيلة رقم '+no})}});
+if(r.shell>0)ensure(shId(),'قشر').rows.push({d:r.date,ts:r.id,in:r.shell,t:'ناتج تشغيلة رقم '+no});
+(r.by||[]).forEach(x=>{if(x.kg>0)ensure(x.id,x.n).rows.push({d:r.date,ts:r.id,in:x.kg,t:'ناتج تشغيلة رقم '+no})})}});
 Object.values(MV).filter(v=>v.st==st).forEach(v=>ensure(v.item,v.n).rows.push({d:v.date,ts:v.ts||0,in:v.dir=='in'?v.qty:0,out:v.dir=='out'?v.qty:0,t:mvLabel(v),mv:v}));
 Object.values(L).forEach(it=>{it.rows.sort((a,b)=>(a.d||'').localeCompare(b.d||'')||a.ts-b.ts);let b=0,i=0,o=0;
 it.rows.forEach(r=>{i+=r.in||0;o+=r.out||0;b+=(r.in||0)-(r.out||0);r.b=b});it.in=i;it.out=o;it.bal=b});
@@ -288,8 +298,7 @@ e.innerHTML='رصيد مخزن الخام: <b>'+fx(a)+'</b> كجم'+(D.raw>0?' �
 function numberOld(){if(!ME.owner||mig)return;const L=Object.values(RM).filter(r=>!r.no);if(!L.length)return;mig=1;
 let k=Object.values(RM).reduce((a,r)=>Math.max(a,r.no||0),0);L.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||a.id-b.id);
 const b=FS.batch();L.forEach(r=>b.update(FS.doc('runs/'+r.id),{no:++k}));b.commit().catch(()=>{mig=0})}
-
-/* ===== v3: واجهة جديدة + تقارير + تصدير ===== */
+  /* ===== v3: واجهة جديدة + تقارير + تصدير ===== */
 function lt(d){return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)}
 const TD={home:'الرئيسية',new:'تشغيلة',stores:'المخازن',reports:'التقارير',more:'المزيد',runs:'السجل',prices:'الأسعار',acc:'الوصول',raws:'مخزن الخام',fg:'المنتج التام',rp_issues:'الصرفيات',rp_sup:'الموردين',rp_runs:'التشغيلات'};
 let TN={},RG,RP='month',RV='issues',SUBV='raws',RD='';
@@ -329,7 +338,7 @@ let h=`<div class="card"><h3>موردو الخام في الفترة</h3>${nm.le
 nm.forEach((s,i)=>{const a=by[s],ty={};a.forEach(v=>{const k=v.n||v.item;ty[k]=(ty[k]||0)+v.qty});
 h+=`<details class="card" id="k_su_${i}"><summary>🚚 ${esc(s)} · <b>${fx(tq(a))} كجم</b> · ${a.length} توريدة</summary><p class="mu">${Object.keys(ty).map(k=>esc(k)+': '+fx(ty[k])+' كجم').join(' · ')}</p><div class="tw"><table><tr><th>التاريخ<th>نوع الخام<th>الكمية<th>ملاحظة${a.map(v=>`<tr><td>${esc(v.date||'')}<td>${esc(v.n||'')}<td>${fx(v.qty)}<td>${esc(v.sup?v.note||'':'')}`).join('')}</table></div></details>`});
 return h}
-function rnH(){const R=S.runs.filter(r=>inR(r.date||'')),C=R.map(calc),sm=k=>C.reduce((a,c)=>a+c[k],0),g={};R.forEach(r=>r.prods.forEach(x=>{g[x.n]=(g[x.n]||0)+x.kg}));const raw=R.reduce((a,r)=>a+r.raw,0);
+function rnH(){const R=S.runs.filter(r=>inR(r.date||'')),C=R.map(calc),sm=k=>C.reduce((a,c)=>a+c[k],0),g={};R.forEach(r=>{r.prods.forEach(x=>{g[x.n]=(g[x.n]||0)+x.kg});(r.by||[]).forEach(x=>{if(x.kg>0)g[x.n]=(g[x.n]||0)+x.kg})});const raw=R.reduce((a,r)=>a+r.raw,0);
 return `<div class="card"><h3>ملخص التشغيلات</h3><div class="grid"><div><b>${R.length}</b>عدد التشغيلات</div><div><b>${n(raw)} كجم</b>الخام المستهلك</div><div><b>${n(sm('out'))} كجم</b>إجمالي الناتج</div><div class="${sm('soak')&&sm('loss')/sm('soak')>0.08?'bad':''}"><b>${n(sm('soak')?sm('loss')/sm('soak')*100:0)}%</b>متوسط الفقد</div><div><b>${m(sm('cost'))}</b>إجمالي التكلفة</div><div class="${sm('profit')<0?'bad':'ok'}"><b>${m(sm('profit'))}</b>صافي الربح</div></div>
 <div class="tw"><table><tr><th>الصنف<th>كجم<th>% من الخام${Object.keys(g).map(k=>`<tr><td>${esc(k)}<td>${fx(g[k])}<td>${n(raw?g[k]/raw*100:0)}%`).join('')}</table></div></div>
 <div class="card"><h3>قائمة التشغيلات</h3>${R.length?`<div class="tw"><table><tr><th>#<th>التاريخ<th>الخام<th>الناتج<th>الفقد<th>الربح${R.map((r,i)=>`<tr><td>${r.no||''}<td>${esc(r.date||'')}<td>${fx(r.raw)}<td>${fx(C[i].out)}<td>${n(C[i].lossP)}%<td>${m(C[i].profit)}`).join('')}</table></div>`:'<p class="mu">مفيش تشغيلات في الفترة دي.</p>'}</div>`}
@@ -352,7 +361,8 @@ a=[['رقم','التاريخ','ملاحظة / المورد','نوع الخام',
 b=[['رقم','التاريخ','الصنف','كجم','% من الخام','سعر بيع الكجم','إجمالي التكلفة','تكلفة الكجم','ربح الكجم','ربح الصنف']];
 R.forEach((r,i)=>{const c=C[i];a.push([r.no||'',r.date,r.note,r.rawN,r.raw,r.rawP,c.moist,c.soak,c.out,c.shell,c.loss,c.lossP,c.lossC,c.rawCost,c.proc,c.cost,c.shellRev,c.rev,c.profit].map(rnd));
 c.ps.forEach(x=>b.push([r.no||'',r.date,x.n,x.kg,r.raw?x.kg/r.raw*100:0,x.p,x.c,x.cpk,x.p-x.cpk,x.kg*(x.p-x.cpk)].map(rnd)));
-b.push([r.no||'',r.date,'قشر (إيراد)',r.shell,r.raw?r.shell/r.raw*100:0,r.shellP,'','','',c.shellRev].map(rnd))});return[a,b]}
+b.push([r.no||'',r.date,'قشر (إيراد)',r.shell,r.raw?r.shell/r.raw*100:0,r.shellP,'','','',c.shellRev].map(rnd));
+(r.by||[]).filter(x=>x.kg>0).forEach(x=>b.push([r.no||'',r.date,x.n+' (إيراد)',x.kg,r.raw?x.kg/r.raw*100:0,x.p,'','','',x.kg*x.p].map(rnd)))});return[a,b]}
 function xl(sheets,fn){const W=XLSX.utils,wb=W.book_new();wb.Workbook={Views:[{RTL:true}]};
 sheets.forEach(([nm,rows])=>{const w=W.aoa_to_sheet(rows);w['!cols']=(rows[0]||[]).map(()=>({wch:18}));W.book_append_sheet(wb,w,nm.slice(0,31))});
 DL.save({filename:fn+'-'+today()+'.xlsx',data:XLSX.write(wb,{bookType:'xlsx',type:'array'})})}
